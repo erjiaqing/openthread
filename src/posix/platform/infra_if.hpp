@@ -130,6 +130,18 @@ public:
                         uint16_t            aBufferLength);
 
     /**
+     * This method request an address lookup for the given host name asynchronously.
+     *
+     * @param[in]  aInfraIfIndex  The index of the infrastructure interface this message is sent to.
+     * @param[in]  aHostName      The host name to look up the address.
+     *
+     * @retval  OT_ERROR_NONE    Succefully request address look-up.
+     * @retval  OT_ERROR_FAILED  Failed to request address look-up.
+     *
+     */
+    otError RequestHostAddressAsync(uint32_t aInfraIfIndex, const char *aHostName);
+
+    /**
      * This method gets the infrastructure network interface name.
      *
      * @returns The infrastructure network interface name, or `nullptr` if not specified.
@@ -146,14 +158,15 @@ public:
     static InfraNetif &Get(void);
 
 private:
-    char     mInfraIfName[IFNAMSIZ];
-    uint32_t mInfraIfIndex       = 0;
-    int      mInfraIfIcmp6Socket = -1;
-    int      mNetLinkSocket      = -1;
+    char            mInfraIfName[IFNAMSIZ];
+    static uint32_t mInfraIfIndex;
+    int             mInfraIfIcmp6Socket = -1;
+    int             mNetLinkSocket      = -1;
 
-    void ReceiveNetLinkMessage(void);
-    void ReceiveIcmp6Message(void);
-    bool HasLinkLocalAddress(void) const;
+    void        ReceiveNetLinkMessage(void);
+    void        ReceiveIcmp6Message(void);
+    bool        HasLinkLocalAddress(void) const;
+    static void HandleHostAddressResponse(union sigval sv);
 };
 
 } // namespace Posix

@@ -51,4 +51,12 @@ otError otPlatInfraIfSendIcmp6Nd(uint32_t            aInfraIfIndex,
 
     return OT_ERROR_FAILED;
 }
+
+otError otPlatInfraIfRequestHostAddress(uint32_t aInfraIfIndex, const char *aHostName)
+{
+    OT_UNUSED_VARIABLE(aInfraIfIndex);
+    OT_UNUSED_VARIABLE(aHostName);
+
+    return OT_ERROR_FAILED;
+}
 #endif

@@ -806,6 +806,8 @@ public:
         return static_cast<const NetworkPrefix &>(mFields.mComponents.mNetworkPrefix);
     }
 
+    Prefix GetPrefix(uint8_t aLength) const;
+
     /**
      * This method indicates whether the IPv6 address matches a given prefix.
      *

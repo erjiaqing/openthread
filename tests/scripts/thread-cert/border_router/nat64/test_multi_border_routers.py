@@ -90,6 +90,8 @@ class Nat64MultiBorderRouter(thread_cert.TestCase):
 
         br1.start()
         self.simulator.go(config.LEADER_STARTUP_DELAY)
+        br1.bash("service bind9 stop")
+        self.simulator.go(330)
         self.assertEqual('leader', br1.get_state())
 
         router.start()
@@ -101,7 +103,8 @@ class Nat64MultiBorderRouter(thread_cert.TestCase):
         #         its local nat64 prefix to Network Data.
         #
         br2.start()
-        self.simulator.go(config.BORDER_ROUTER_STARTUP_DELAY)
+        br2.bash("service bind9 stop")
+        self.simulator.go(330)
         self.assertEqual('router', br2.get_state())
 
         # Only 1 NAT64 prefix in Network Data.

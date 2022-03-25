@@ -139,7 +139,7 @@ public:
      * @retval kErrorFailed  Failed to send the ICMPv6 message.
      *
      */
-    Error Send(const Icmp6Packet &aPacket, const Ip6::Address &aDestination);
+    Error SendIcmp6Nd(const Icmp6Packet &aPacket, const Ip6::Address &aDestination);
 
     /**
      * This method processes a received ICMPv6 Neighbor Discovery packet from an infrastructure interface.
@@ -149,7 +149,34 @@ public:
      * @param[in]  aPacket        The ICMPv6 packet.
      *
      */
-    void HandledReceived(uint32_t aIfIndex, const Ip6::Address &aSource, const Icmp6Packet &aPacket);
+    void HandledReceivedIcmp6Nd(uint32_t aIfIndex, const Ip6::Address &aSource, const Icmp6Packet &aPacket);
+
+    /**
+     * This method requests an IPv6 address look-up for the given host name on the infrastructure interface.
+     *
+     * @note  This method MUST be used when interface is initialized.
+     *
+     * @param[in]  aHostName      The host name to look up the address.
+     *
+     * @retval  kErrorNone    Succefully request address look-up.
+     * @retval  kErrorFailed  Failed to request address look-up.
+     *
+     */
+    Error RequestHostAddress(const char *aHostName);
+
+    /**
+     * This method processes received host address lookup results from an infrastructure interface.
+     *
+     * @param[in]  aIfIndex       The infrastructure interface index on which the host address is received.
+     * @param[in]  aHostName      The host name that the received address is associated with.
+     * @param[in]  aAddresses     The pointer to received addresses.
+     * @param[in]  aNumAddresses  The number of received addresses.
+     *
+     */
+    void HandleReceivedHostAddress(uint32_t            aIfIndex,
+                                   const char *        aHostName,
+                                   const Ip6::Address *aAddresses,
+                                   uint8_t             aNumAddresses);
 
     /**
      * This method handles infrastructure interface state changes.

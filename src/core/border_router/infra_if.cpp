@@ -86,14 +86,14 @@ bool InfraIf::HasAddress(const Ip6::Address &aAddress)
     return otPlatInfraIfHasAddress(mIfIndex, &aAddress);
 }
 
-Error InfraIf::Send(const Icmp6Packet &aPacket, const Ip6::Address &aDestination)
+Error InfraIf::SendIcmp6Nd(const Icmp6Packet &aPacket, const Ip6::Address &aDestination)
 {
     OT_ASSERT(mInitialized);
 
     return otPlatInfraIfSendIcmp6Nd(mIfIndex, &aDestination, aPacket.GetBytes(), aPacket.GetLength());
 }
 
-void InfraIf::HandledReceived(uint32_t aIfIndex, const Ip6::Address &aSource, const Icmp6Packet &aPacket)
+void InfraIf::HandledReceivedIcmp6Nd(uint32_t aIfIndex, const Ip6::Address &aSource, const Icmp6Packet &aPacket)
 {
     Error error = kErrorNone;
 
@@ -102,12 +102,38 @@ void InfraIf::HandledReceived(uint32_t aIfIndex, const Ip6::Address &aSource, co
     VerifyOrExit(aPacket.GetBytes() != nullptr, error = kErrorInvalidArgs);
     VerifyOrExit(aPacket.GetLength() >= sizeof(Ip6::Icmp::Header), error = kErrorParse);
 
-    Get<RoutingManager>().HandleReceived(aPacket, aSource);
+    Get<RoutingManager>().HandleReceivedIcmp6Nd(aPacket, aSource);
 
 exit:
     if (error != kErrorNone)
     {
         LogDebg("Dropped ICMPv6 message: %s", ErrorToString(error));
+    }
+}
+
+Error InfraIf::RequestHostAddress(const char *aHostName)
+{
+    OT_ASSERT(mInitialized);
+
+    return otPlatInfraIfRequestHostAddress(mIfIndex, aHostName);
+}
+
+void InfraIf::HandleReceivedHostAddress(uint32_t            aIfIndex,
+                                        const char *        aHostName,
+                                        const Ip6::Address *aAddresses,
+                                        uint8_t             aNumAddresses)
+{
+    Error error = kErrorNone;
+
+    VerifyOrExit(mInitialized && mIsRunning, error = kErrorInvalidState);
+    VerifyOrExit(aIfIndex == mIfIndex, error = kErrorInvalidArgs);
+
+    Get<RoutingManager>().HandleReceivedHostAddress(aHostName, aAddresses, aNumAddresses);
+
+exit:
+    if (error != kErrorNone)
+    {
+        LogDebg("Failed to handle received host address: %s", ErrorToString(error));
     }
 }
 
@@ -148,12 +174,22 @@ extern "C" void otPlatInfraIfRecvIcmp6Nd(otInstance *        aInstance,
     InfraIf::Icmp6Packet packet;
 
     packet.Init(aBuffer, aBufferLength);
-    AsCoreType(aInstance).Get<InfraIf>().HandledReceived(aInfraIfIndex, AsCoreType(aSrcAddress), packet);
+    AsCoreType(aInstance).Get<InfraIf>().HandledReceivedIcmp6Nd(aInfraIfIndex, AsCoreType(aSrcAddress), packet);
 }
 
 extern "C" otError otPlatInfraIfStateChanged(otInstance *aInstance, uint32_t aInfraIfIndex, bool aIsRunning)
 {
     return AsCoreType(aInstance).Get<InfraIf>().HandleStateChanged(aInfraIfIndex, aIsRunning);
+}
+
+extern "C" void otPlatInfraIfReceiveHostAddress(otInstance *        aInstance,
+                                                uint32_t            aInfraIfIndex,
+                                                const char *        aHostName,
+                                                const otIp6Address *aIp6Addresses,
+                                                uint8_t             aNumAddresses)
+{
+    AsCoreType(aInstance).Get<InfraIf>().HandleReceivedHostAddress(aInfraIfIndex, aHostName,
+                                                                   AsCoreTypePtr(aIp6Addresses), aNumAddresses);
 }
 
 } // namespace BorderRouter

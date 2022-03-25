@@ -134,6 +134,35 @@ extern void otPlatInfraIfRecvIcmp6Nd(otInstance *        aInstance,
 extern otError otPlatInfraIfStateChanged(otInstance *aInstance, uint32_t aInfraIfIndex, bool aIsRunning);
 
 /**
+ * This method requests an IPv6 address look-up for the given host name.
+ *
+ * @param[in]  aInfraIfIndex  The index of the infrastructure interface this message is sent to.
+ * @param[in]  aHostName      The host name to look up the address.
+ *
+ * @retval  OT_ERROR_NONE    Succefully request address look-up.
+ * @retval  OT_ERROR_FAILED  Failed to request address look-up.
+ *
+ */
+otError otPlatInfraIfRequestHostAddress(uint32_t aInfraIfIndex, const char *aHostName);
+
+/**
+ * The infra interface driver calls this method to notify OpenThread that IPv6 addresses of
+ * the given host name is received.
+ *
+ * @param[in]  aInstance      The OpenThread instance structure.
+ * @param[in]  aInfraIfIndex  The index of the infrastructure interface on which the address is received.
+ * @param[in]  aHostName      The host name that the received address is associated with.
+ * @param[in]  aIp6Addresses  The pointer to received addresses.
+ * @param[in]  aNumAddresses  The number of received addresses.
+ *
+ */
+extern void otPlatInfraIfReceiveHostAddress(otInstance *        aInstance,
+                                            uint32_t            aInfraIfIndex,
+                                            const char *        aHostName,
+                                            const otIp6Address *aIp6Addresses,
+                                            uint8_t             aNumAddresses);
+
+/**
  * @}
  *
  */

@@ -188,9 +188,9 @@ public:
 
 #if OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
     /**
-     * This method returns the local NAT64 prefix.
+     * This method returns the infrastructure or local NAT64 prefix.
      *
-     * The local NAT64 prefix will be published in the Thread network
+     * The NAT64 prefix will be published in the Thread network
      * if none exists.
      *
      * @param[out]  aPrefix  A reference to where the prefix will be output to.
@@ -203,6 +203,16 @@ public:
 #endif // OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
 
     /**
+     * This method processes received host address lookup results from the infrastructure interface.
+     *
+     * @param[in]  aHostName      The host name that the received address is associated with.
+     * @param[in]  aAddresses     The pointer to received addresses.
+     * @param[in]  aNumAddresses  The number of received addresses.
+     *
+     */
+    void HandleReceivedHostAddress(const char *aHostName, const Ip6::Address *aAddresses, uint8_t aNumAddresses);
+
+    /**
      * This method processes a received ICMPv6 message from the infrastructure interface.
      *
      * Malformed or undesired messages are dropped silently.
@@ -211,7 +221,7 @@ public:
      * @param[in]  aSrcAddress    The source address this message is sent from.
      *
      */
-    void HandleReceived(const InfraIf::Icmp6Packet &aPacket, const Ip6::Address &aSrcAddress);
+    void HandleReceivedIcmp6Nd(const InfraIf::Icmp6Packet &aPacket, const Ip6::Address &aSrcAddress);
 
     /**
      * This method handles infrastructure interface state changes.
@@ -288,6 +298,7 @@ private:
 
     static constexpr uint32_t kDefaultOmrPrefixLifetime    = 1800; // The default OMR prefix valid lifetime. In sec.
     static constexpr uint32_t kDefaultOnLinkPrefixLifetime = 1800; // The default on-link prefix valid lifetime. In sec.
+    static constexpr uint32_t kDefaultNat64PrefixLifetime  = 300;  // The default NAT64 prefix valid lifetime. In sec.
     static constexpr uint32_t kMaxRtrAdvInterval           = 600;  // Max Router Advertisement Interval. In sec.
     static constexpr uint32_t kMinRtrAdvInterval           = kMaxRtrAdvInterval / 3; // Min RA Interval. In sec.
     static constexpr uint32_t kMaxInitRtrAdvInterval       = 16;                     // Max Initial RA Interval. In sec.
@@ -306,6 +317,10 @@ private:
     // prefix.
     // The value is chosen in range of [`kMaxRtrAdvInterval` upper bound (1800s), `kDefaultOnLinkPrefixLifetime`].
     static constexpr uint32_t kRtrAdvStaleTime = 1800;
+
+    static const char    kWellKnownIpv4OnlyName[];     // "ipv4only.arpa"
+    static const uint8_t kWellKnownIpv4OnlyAddress1[]; // 192.0.0.170
+    static const uint8_t kWellKnownIpv4OnlyAddress2[]; // 192.0.0.171
 
     static_assert(kMinRtrAdvInterval <= 3 * kMaxRtrAdvInterval / 4, "invalid RA intervals");
     static_assert(kDefaultOmrPrefixLifetime >= kMaxRtrAdvInterval, "invalid default OMR prefix lifetime");
@@ -541,6 +556,8 @@ private:
     void EvaluateOnLinkPrefix(void);
 
 #if OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
+    void RequestInfraIfNat64Prefix(void);
+    void UpdateInfraIfNat64Prefix(const Ip6::Prefix &aPrefix);
     void GenerateNat64Prefix(void);
     void EvaluateNat64Prefix(void);
 #endif
@@ -565,6 +582,9 @@ private:
     static void HandleRoutingPolicyTimer(Timer &aTimer);
     void        HandleOnLinkPrefixDeprecateTimer(void);
     static void HandleOnLinkPrefixDeprecateTimer(Timer &aTimer);
+#if OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
+    static void HandleInfraIfNat64PrefixStaleTimer(Timer &aTimer);
+#endif
 
     void DeprecateOnLinkPrefix(void);
     void HandleRouterSolicit(const InfraIf::Icmp6Packet &aPacket, const Ip6::Address &aSrcAddress);
@@ -619,13 +639,21 @@ private:
     TimeMilli  mTimeAdvertisedOnLinkPrefix;
     TimerMilli mOnLinkPrefixDeprecateTimer;
 
+    DiscoveredPrefixTable mDiscoveredPrefixTable;
+
+#if OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
+    // The latest NAT64 prefix discovered on the infrastructure interface.
+    Ip6::Prefix mInfraIfNat64Prefix;
     // The NAT64 prefix allocated from the /48 BR ULA prefix.
     Ip6::Prefix mLocalNat64Prefix;
+    // The NAT64 prefix advertised in Network Data. It can have the following value:
+    // - empty: no NAT64 prefix is advertised from this BR
+    // - the local NAT64 prefix
+    // - the latest advertised infrastructure NAT64 prefix, which might differs from mInfraIfNat64Prefix
+    Ip6::Prefix mAdvertisedNat64Prefix;
 
-    // True if the local NAT64 prefix is advertised in Thread network.
-    bool mIsAdvertisingLocalNat64Prefix;
-
-    DiscoveredPrefixTable mDiscoveredPrefixTable;
+    TimerMilli mInfraIfNat64PrefixStaleTimer;
+#endif
 
     // The RA header and parameters for the infra interface.
     // This value is initialized with `RouterAdvMessage::SetToDefault`

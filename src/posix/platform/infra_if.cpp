@@ -41,10 +41,12 @@
 
 #include <errno.h>
 #include <ifaddrs.h>
+#include <netdb.h>
 // clang-format off
 #include <netinet/in.h>
 #include <netinet/icmp6.h>
 // clang-format on
+#include <signal.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -59,6 +61,8 @@
 #include "common/debug.hpp"
 #include "lib/platform/exit_code.h"
 #include "posix/platform/infra_if.hpp"
+
+uint32_t ot::Posix::InfraNetif::mInfraIfIndex = 0;
 
 bool otPlatInfraIfHasAddress(uint32_t aInfraIfIndex, const otIp6Address *aAddress)
 {
@@ -94,6 +98,11 @@ otError otPlatInfraIfSendIcmp6Nd(uint32_t            aInfraIfIndex,
                                  uint16_t            aBufferLength)
 {
     return ot::Posix::InfraNetif::Get().SendIcmp6Nd(aInfraIfIndex, *aDestAddress, aBuffer, aBufferLength);
+}
+
+otError otPlatInfraIfRequestHostAddress(uint32_t aInfraIfIndex, const char *aHostName)
+{
+    return ot::Posix::InfraNetif::Get().RequestHostAddressAsync(aInfraIfIndex, aHostName);
 }
 
 bool platformInfraIfIsRunning(void)
@@ -513,6 +522,83 @@ exit:
     {
         otLogDebgPlat("Failed to handle ICMPv6 message: %s", otThreadErrorToString(error));
     }
+}
+
+void InfraNetif::HandleHostAddressResponse(union sigval sv)
+{
+    struct gaicb *   req = (struct gaicb *)sv.sival_ptr;
+    struct addrinfo *res = (struct addrinfo *)req->ar_result;
+
+    const uint8_t kMaxHostAddresses = 10;
+    otIp6Address  addresses[kMaxHostAddresses];
+    uint8_t       numAddresses = 0;
+
+    otLogInfoPlat("Handling host address response...");
+
+    for (struct addrinfo *rp = res; rp != NULL && numAddresses < kMaxHostAddresses; rp = rp->ai_next)
+    {
+        struct sockaddr_in6 *ip6Addr;
+
+        if (rp->ai_family != AF_INET6)
+        {
+            continue;
+        }
+
+        ip6Addr = reinterpret_cast<sockaddr_in6 *>(rp->ai_addr);
+        memcpy(&addresses[numAddresses].mFields.m8, &ip6Addr->sin6_addr.s6_addr, OT_IP6_ADDRESS_SIZE);
+        numAddresses++;
+    }
+
+    otPlatInfraIfReceiveHostAddress(gInstance, mInfraIfIndex, (char *)req->ar_name, addresses, numAddresses);
+
+    freeaddrinfo(res);
+    freeaddrinfo((struct addrinfo *)req->ar_request);
+    free(req);
+}
+
+otError InfraNetif::RequestHostAddressAsync(uint32_t aInfraIfIndex, const char *aHostName)
+{
+    otError          error = OT_ERROR_NONE;
+    struct addrinfo *hints;
+    struct gaicb *   reqs[1];
+    struct sigevent  sig;
+    int              status;
+
+    VerifyOrExit(aInfraIfIndex == mInfraIfIndex, error = OT_ERROR_DROP);
+
+    hints = (struct addrinfo *)malloc(sizeof(struct addrinfo));
+    VerifyOrExit(hints != nullptr, error = OT_ERROR_NO_BUFS);
+    memset(hints, 0, sizeof(struct addrinfo));
+    hints->ai_family   = AF_INET6;
+    hints->ai_socktype = SOCK_STREAM;
+
+    reqs[0] = (struct gaicb *)malloc(sizeof(struct gaicb));
+    VerifyOrExit(reqs[0] != nullptr, error = OT_ERROR_NO_BUFS);
+    memset(reqs[0], 0, sizeof(struct gaicb));
+    reqs[0]->ar_name    = aHostName;
+    reqs[0]->ar_request = hints;
+
+    memset(&sig, 0, sizeof(struct sigevent));
+    sig.sigev_notify          = SIGEV_THREAD;
+    sig.sigev_value.sival_ptr = reqs[0];
+    sig.sigev_notify_function = &InfraNetif::HandleHostAddressResponse;
+
+    status = getaddrinfo_a(GAI_NOWAIT, reqs, 1, &sig);
+
+    if (status != 0)
+    {
+        otLogNotePlat("getaddrinfo_a failed: %s", gai_strerror(status));
+        ExitNow(error = OT_ERROR_FAILED);
+    }
+    otLogInfoPlat("getaddrinfo_a requested for %s", aHostName);
+
+exit:
+    if (error != OT_ERROR_NONE)
+    {
+        freeaddrinfo(hints);
+        free(reqs[0]);
+    }
+    return error;
 }
 
 void InfraNetif::Process(const otSysMainloopContext &aContext)

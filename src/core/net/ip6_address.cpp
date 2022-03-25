@@ -360,6 +360,14 @@ void Address::SetToRealmLocalAllMplForwarders(void)
     *this = GetRealmLocalAllMplForwarders();
 }
 
+Prefix Address::GetPrefix(uint8_t aLength) const
+{
+    Prefix prefix;
+    prefix.Set(mFields.m8, aLength);
+
+    return prefix;
+}
+
 bool Address::MatchesPrefix(const Prefix &aPrefix) const
 {
     return Prefix::MatchLength(mFields.m8, aPrefix.GetBytes(), aPrefix.GetBytesSize()) >= aPrefix.GetLength();

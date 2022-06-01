@@ -34,7 +34,7 @@
 
 #include "nat64.hpp"
 
-// #if OPENTHREAD_CONFIG_BORDER_ROUTING_ENABLE && OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
+#if OPENTHREAD_CONFIG_BORDER_ROUTING_ENABLE && OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
 
 #include <openthread/border_router.h>
 #include <openthread/logging.h>
@@ -91,6 +91,7 @@ Nat64::Result Nat64::HandleOutgoing(Message &aMessage)
 
     if (!mNat64Prefix.IsValidNat64())
     {
+        LogInfo("Nat64 is not enabled.");
         ExitNow(nat64TranslationResult = Result::kForward);
     }
 
@@ -102,6 +103,8 @@ Nat64::Result Nat64::HandleOutgoing(Message &aMessage)
 
     if (!ip6Header.GetDestination().MatchesPrefix(mNat64Prefix))
     {
+        LogInfo("Dest %s Prefix %s not match", ip6Header.GetDestination().ToString().AsCString(),
+                mNat64Prefix.ToString().AsCString());
         // Target is not in NAT64 network, handle it as usual.
         ExitNow(nat64TranslationResult = Result::kForward);
     }
@@ -251,7 +254,7 @@ exit:
 
 void Nat64::ReleaseMapping(AddressMapping &aMapping)
 {
-    LogInfo("mapping removed: %s -> %s", aMapping.mIP6.ToString().AsCString(), aMapping.mIP4.ToString().AsCString());
+    LogInfo("mapping removed: %s = %s", aMapping.mIP6.ToString().AsCString(), aMapping.mIP4.ToString().AsCString());
     mIp4AddressPool[mAvailableAddressCount] = aMapping.mIP4;
     mAvailableAddressCount++;
     mAddressMappingPool.Free(aMapping);
@@ -293,7 +296,7 @@ const Nat64::AddressMapping *Nat64::CreateMapping(const Ip6::Address &aAddr)
     mapping->mIP4 = mIp4AddressPool[mAvailableAddressCount];
     mapping->Touch();
     mActiveAddressMappings.Push(*mapping);
-    LogInfo("mapping created: %s -> %s", mapping->mIP6.ToString().AsCString(), mapping->mIP4.ToString().AsCString());
+    LogInfo("mapping created: %s = %s", mapping->mIP6.ToString().AsCString(), mapping->mIP4.ToString().AsCString());
 
 exit:
     return mapping;
@@ -386,7 +389,8 @@ static Nat64::Result Icmp4ParameterProblemToIcmp6Header(const Ip4::Icmp::Header 
     uint8_t       pointer;
     const uint8_t pointerMap[20] = {0, 1, 4, 4, 0xff, 0xff, 0xff, 0xff, 7, 6, 0xff, 0xff, 8, 8, 8, 8, 24, 24, 24, 24};
 
-    VerifyOrExit(aIcmp4Header.GetCode() == Ip4::Icmp::Header::Code::kCodePointerIndicated || aIcmp4Header.GetCode() == Ip4::Icmp::Header::Code::kCodeBadLength);
+    VerifyOrExit(aIcmp4Header.GetCode() == Ip4::Icmp::Header::Code::kCodePointerIndicated ||
+                 aIcmp4Header.GetCode() == Ip4::Icmp::Header::Code::kCodeBadLength);
 
     pointer = aIcmp4Header.mRestOfHeader.m8[0];
 
@@ -425,6 +429,7 @@ Nat64::Result Nat64::TranslateIcmp4(const AddressMapping &aMapping, Message &aMe
         VerifyOrExit((icmpTranslationResult = Icmp4UnreachToIcmp6Header(icmp4Header, icmp6Header)) == Result::kForward);
         VerifyOrExit((icmpTranslationResult = TranslateIcmp4Payload(aMapping, aMessage)) == Result::kForward);
         aMessage.Prepend(icmp6Header);
+        aMessage.SetOffset(aMessage.GetOffset() - sizeof(icmp6Header));
         break;
     }
     case Ip4::Icmp::Header::Type::kTypeTimeExceeded:
@@ -434,6 +439,7 @@ Nat64::Result Nat64::TranslateIcmp4(const AddressMapping &aMapping, Message &aMe
         VerifyOrExit((icmpTranslationResult = TranslateIcmp4Payload(aMapping, aMessage)) == Result::kForward);
         icmp6Header.SetType(Ip6::Icmp::Header::Type::kTypeTimeExceeded);
         aMessage.Prepend(icmp6Header);
+        aMessage.SetOffset(aMessage.GetOffset() - sizeof(icmp6Header));
         break;
     }
     case Ip4::Icmp::Header::Type::kTypeParameterProblem:
@@ -443,6 +449,7 @@ Nat64::Result Nat64::TranslateIcmp4(const AddressMapping &aMapping, Message &aMe
                      Result::kForward);
         VerifyOrExit((icmpTranslationResult = TranslateIcmp4Payload(aMapping, aMessage)) == Result::kForward);
         aMessage.Prepend(icmp6Header);
+        aMessage.SetOffset(aMessage.GetOffset() - sizeof(icmp6Header));
         break;
     }
     default:
@@ -453,68 +460,30 @@ exit:
     return icmpTranslationResult;
 }
 
-uint16_t Nat64::ChecksumSubtract(uint16_t aOriginal, const void *aBuf, uint16_t aLength)
-{
-    int32_t aOriginalSum = ~aOriginal;
-    for (uint16_t i = 0; i < aLength; i++)
-    {
-        uint8_t val = reinterpret_cast<const uint8_t *>(aBuf)[i];
-        if (i % 2 == 1)
-        {
-            aOriginalSum -= (val << 8);
-        }
-        else
-        {
-            aOriginalSum -= val;
-        }
-        if (aOriginalSum < 0)
-        {
-            aOriginalSum = (aOriginalSum & 0xffff);
-            aOriginalSum--;
-        }
-    }
-    return ~static_cast<uint16_t>(aOriginalSum);
-}
-
-uint16_t Nat64::ChecksumAdd(uint16_t aOriginal, const void *aBuf, uint16_t aLength)
-{
-    int32_t aOriginalSum = ~aOriginal;
-    for (uint16_t i = 0; i < aLength; i++)
-    {
-        uint8_t val = reinterpret_cast<const uint8_t *>(aBuf)[i];
-        if (i % 2 == 1)
-        {
-            aOriginalSum += (val << 8);
-        }
-        else
-        {
-            aOriginalSum += val;
-        }
-        if (aOriginalSum > 0xffff)
-        {
-            aOriginalSum = (aOriginalSum & 0xffff);
-            aOriginalSum++;
-        }
-    }
-    return ~static_cast<uint16_t>(aOriginalSum);
-}
-
 Nat64::Result Nat64::TranslateIcmp4Payload(const AddressMapping &aMapping, Message &aMessage)
 {
     Result      res = Result::kDrop;
     Ip4::Header ip4Header;
     Ip6::Header ip6Header;
-    uint8_t     icmpPayload[kIpPayloadInIcmp4];
-    uint16_t    payloadChecksum;
-    uint16_t    checksumOffset     = kIpPayloadInIcmp4;
-    bool        needUpdateChecksum = false;
+    uint8_t     icmpPayload[Ip4::Icmp::kMinErrorMessageDataLength];
+    uint16_t    icmpPayloadSize;
+    uint16_t    embeddedIpChecksum;
 
     aMessage.ReadBytes(0, &ip4Header, sizeof(ip4Header));
-    aMessage.ReadBytes(sizeof(ip4Header), icmpPayload, kIpPayloadInIcmp4);
+    // Per RFC792, the minimal size of ICMP payload is 8 octets, then we always truncate it into 8 octets here.
+    icmpPayloadSize = aMessage.ReadBytes(sizeof(ip4Header), icmpPayload, sizeof(icmpPayload));
 
-    if (ip4Header.GetDestination() != aMapping.mIP4)
+    if (ip4Header.GetSource() != aMapping.mIP4)
     {
-        LogWarn("destination in the IP header in the incoming ICMP4 packet does not match the outer IP header, drop");
+        LogWarn("source in the IP header in the incoming ICMP4 packet does not match the outer IP header, drop");
+        ExitNow();
+    }
+
+    embeddedIpChecksum = ip4Header.GetChecksum();
+    Checksum::UpdateIPv4HeaderChecksum(ip4Header);
+    if (ip4Header.GetChecksum() != embeddedIpChecksum)
+    {
+        LogWarn("failed to validate IP checksum of embedded packet, drop");
         ExitNow();
     }
 
@@ -524,17 +493,14 @@ Nat64::Result Nat64::TranslateIcmp4Payload(const AddressMapping &aMapping, Messa
     {
     case Ip4::kProtoTcp:
         ip6Header.SetNextHeader(Ip6::kProtoTcp);
-        checksumOffset = Ip4::Tcp::Header::kChecksumFieldOffset;
         break;
 
     case Ip4::kProtoUdp:
         ip6Header.SetNextHeader(Ip6::kProtoUdp);
-        checksumOffset = Ip4::Udp::Header::kChecksumFieldOffset;
         break;
 
     case Ip4::kProtoIcmp:
         ip6Header.SetNextHeader(Ip6::kProtoIcmp6);
-        checksumOffset = Ip4::Icmp::Header::kChecksumFieldOffset;
         break;
 
     default:
@@ -542,47 +508,22 @@ Nat64::Result Nat64::TranslateIcmp4Payload(const AddressMapping &aMapping, Messa
         ExitNow();
     }
 
+    // Rebuild the original packet
     ip6Header.InitVersionTrafficClassFlow();
-    ip6Header.GetSource().SynthesizeFromIp4Address(mNat64Prefix, ip4Header.GetSource());
-    ip6Header.SetDestination(aMapping.mIP6);
+    ip6Header.SetSource(aMapping.mIP6);
+    ip6Header.GetDestination().SynthesizeFromIp4Address(mNat64Prefix, ip4Header.GetDestination());
     ip6Header.SetFlow(0);
     ip6Header.SetHopLimit(ip4Header.GetTtl());
     ip6Header.SetPayloadLength(ip4Header.GetTotalLength() - sizeof(ip4Header));
 
-    needUpdateChecksum = checksumOffset + sizeof(payloadChecksum) <= kIpPayloadInIcmp4;
-    if (needUpdateChecksum)
-    {
-        memcpy(&payloadChecksum, &icmpPayload[checksumOffset], sizeof(payloadChecksum));
-        payloadChecksum = HostSwap16(payloadChecksum);
+    // Note: Per RFC5508 we should not validate transport checksum even when it is possible to do so, thus we choose not
+    // to update the transport checksum.
 
-        if (ip4Header.GetProtocol() == Ip4::kProtoUdp)
-        {
-            payloadChecksum = ChecksumSubtract(payloadChecksum, &ip4Header.GetSource(), sizeof(Ip4::Address));
-            payloadChecksum = ChecksumSubtract(payloadChecksum, &ip4Header.GetDestination(), sizeof(Ip4::Address));
-            payloadChecksum = ChecksumAdd(payloadChecksum, &ip6Header.GetSource(), sizeof(Ip6::Address));
-            payloadChecksum = ChecksumAdd(payloadChecksum, &ip6Header.GetDestination(), sizeof(Ip6::Address));
-        }
-        else if (ip4Header.GetProtocol() == Ip4::kProtoIcmp)
-        {
-            if (icmpPayload[0] != static_cast<uint8_t>(Ip4::Icmp::Header::Type::kTypeEchoRequest))
-            {
-                // We don't expect the inner ICMP packet contains a ICMP message other than echo request.
-                LogWarn("ICMP payload contains an unexpected ICMP packet");
-                ExitNow();
-            }
-            payloadChecksum = ChecksumSubtract(payloadChecksum, icmpPayload, 2);
-            icmpPayload[0]  = Ip6::Icmp::Header::Type::kTypeEchoRequest;
-            payloadChecksum = ChecksumAdd(payloadChecksum, icmpPayload, 2);
-        }
-        // The TCP checksum is not included in the first 8 bytes of transport layer message.
-
-        payloadChecksum = HostSwap16(payloadChecksum);
-        memcpy(&icmpPayload[checksumOffset], &payloadChecksum, sizeof(payloadChecksum));
-    }
-
-    aMessage.SetLength(aMessage.GetLength() + sizeof(ip6Header) - sizeof(ip4Header));
+    // We have removed ICMP header from the packet, so this length should be the total length of the payload of outer
+    // ICMP message.
+    aMessage.SetLength(sizeof(ip6Header) + icmpPayloadSize);
     aMessage.Write(0, ip6Header);
-    aMessage.Write(sizeof(ip6Header), icmpPayload);
+    aMessage.WriteBytes(sizeof(ip6Header), icmpPayload, icmpPayloadSize);
 
     res = Result::kForward;
 
@@ -616,9 +557,8 @@ exit:
 
 void Nat64::SetIP4Cidr(const Ip4::Cidr &aCidr)
 {
-    uint32_t numberOfHosts = static_cast<uint32_t>(1 << ((Ip4::Address::kSize * 8) - aCidr.mLength));
-    uint32_t hostIdBegin   = 1;
-    uint32_t hostIdEnd     = numberOfHosts - 2;
+    uint32_t numberOfHosts;
+    uint32_t hostIdBegin;
 
     if (mIP4Cidr == aCidr)
     {
@@ -627,34 +567,37 @@ void Nat64::SetIP4Cidr(const Ip4::Cidr &aCidr)
 
     // Avoid using the 0s and 1s in the host id of an address, but what if the user provides us with /32 or /31
     // addresses?
-    if (aCidr.mLength == 1)
+    if (aCidr.mLength == 0)
     {
-        hostIdBegin = hostIdEnd = 0;
-        numberOfHosts           = 1;
+        numberOfHosts = 0;
+        hostIdBegin   = 0;
     }
-    else if (aCidr.mLength == 2)
+    else if (aCidr.mLength == 32)
     {
         hostIdBegin   = 0;
-        hostIdEnd     = 1;
+        numberOfHosts = 1;
+    }
+    else if (aCidr.mLength == 31)
+    {
+        hostIdBegin   = 0;
         numberOfHosts = 2;
     }
     else
     {
-        numberOfHosts -= 2;
+        hostIdBegin   = 1;
+        numberOfHosts = static_cast<uint32_t>((1 << (Ip4::Address::kSize * 8 - aCidr.mLength)) - 2);
     }
+
+    numberOfHosts = OT_MIN(numberOfHosts, kAddressMappingPoolSize);
+
     mAddressMappingPool.FreeAll();
 
-    for (uint32_t i = hostIdBegin; i <= hostIdEnd && i < hostIdBegin + kAddressMappingPoolSize; i++)
+    for (uint32_t i = hostIdBegin; i < hostIdBegin + numberOfHosts; i++)
     {
         mIp4AddressPool[i - hostIdBegin].SynthesizeFromCidrAndHost(aCidr, i);
     }
 
-    if (numberOfHosts > kAddressMappingPoolSize)
-    {
-        numberOfHosts = kAddressMappingPoolSize;
-    }
-
-    LogInfo("Set IPv4 CIDR for NAT64: %s (%u available addresses)", aCidr.ToString().AsCString(), numberOfHosts);
+    LogInfo("Set IPv4 CIDR for NAT64: %s (%u addresses)", aCidr.ToString().AsCString(), numberOfHosts);
     mAvailableAddressCount = numberOfHosts;
     mIP4Cidr               = aCidr;
 
@@ -676,4 +619,4 @@ extern "C" void otBorderRouterSetIpv4CidrForNat64(otInstance *aInstance, otIp4Ci
 } // namespace BorderRouter
 } // namespace ot
 
-// #endif // OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
+#endif // OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE

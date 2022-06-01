@@ -37,7 +37,7 @@
 
 #include "openthread-core-config.h"
 
-// #if OPENTHREAD_CONFIG_BORDER_ROUTING_ENABLE && OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
+#if OPENTHREAD_CONFIG_BORDER_ROUTING_ENABLE && OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
 
 #include "common/linked_list.hpp"
 #include "common/pool.hpp"
@@ -161,9 +161,6 @@ private:
     Pool<AddressMapping, kAddressMappingPoolSize> mAddressMappingPool;
     LinkedList<AddressMapping>                    mActiveAddressMappings;
 
-    static uint16_t ChecksumAdd(uint16_t aOriginal, const void *aBuf, uint16_t aLength);
-    static uint16_t ChecksumSubtract(uint16_t aOriginal, const void *aBuf, uint16_t aLength);
-
     /**
      * @brief Translates the ICMPv4 payload (IPv4 header + first 8 bytes of the message) to ICMP6 payload.
      *
@@ -250,6 +247,6 @@ private:
 } // namespace BorderRouter
 } // namespace ot
 
-// #endif // OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
+#endif // OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
 
 #endif // NAT64_HPP_

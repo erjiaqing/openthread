@@ -229,7 +229,7 @@ typedef struct otMessageInfo
     otIp6Address mPeerAddr; ///< The peer IPv6 address.
     uint16_t     mSockPort; ///< The local transport-layer port.
     uint16_t     mPeerPort; ///< The peer transport-layer port.
-    const void * mLinkInfo; ///< A pointer to link-specific information.
+    const void  *mLinkInfo; ///< A pointer to link-specific information.
     uint8_t      mHopLimit; ///< The IPv6 Hop Limit value. Only applies if `mAllowZeroHopLimit` is FALSE.
                             ///< If `0`, IPv6 Hop Limit is default value `OPENTHREAD_CONFIG_IP6_HOP_LIMIT_DEFAULT`.
                             ///< Otherwise, specifies the IPv6 Hop Limit.
@@ -399,6 +399,25 @@ void otIp6SetMulticastPromiscuousEnabled(otInstance *aInstance, bool aEnabled);
 otMessage *otIp6NewMessage(otInstance *aInstance, const otMessageSettings *aSettings);
 
 /**
+ * Allocate a new message buffer for sending an IPv4 message (which will be translated into an IPv6 packet by NAT64
+ * later). Message buffers allocated by this function will have 20 bytes (The differences between the size of IPv6
+ * headers and the size of IPv4 headers) reserved.
+ *
+ * @note If @p aSettings is 'NULL', the link layer security is enabled and the message priority is set to
+ * OT_MESSAGE_PRIORITY_NORMAL by default.
+ *
+ * @param[in]  aInstance  A pointer to an OpenThread instance.
+ * @param[in]  aSettings  A pointer to the message settings or NULL to set default settings.
+ *
+ * @returns A pointer to the message buffer or NULL if no message buffers are available or parameters are invalid.
+ *
+ * @sa otMessageFree
+ * @sa otBorderRouterSend
+ *
+ */
+otMessage *otIp6NewMessageForNat64(otInstance *aInstance, const otMessageSettings *aSettings);
+
+/**
  * Allocate a new message buffer and write the IPv6 datagram to the message buffer for sending an IPv6 message.
  *
  * @note If @p aSettings is NULL, the link layer security is enabled and the message priority is obtained from IPv6
@@ -415,8 +434,8 @@ otMessage *otIp6NewMessage(otInstance *aInstance, const otMessageSettings *aSett
  * @sa otMessageFree
  *
  */
-otMessage *otIp6NewMessageFromBuffer(otInstance *             aInstance,
-                                     const uint8_t *          aData,
+otMessage *otIp6NewMessageFromBuffer(otInstance              *aInstance,
+                                     const uint8_t           *aData,
                                      uint16_t                 aDataLength,
                                      const otMessageSettings *aSettings);
 
@@ -776,7 +795,7 @@ void otIp6SetSlaacPrefixFilter(otInstance *aInstance, otIp6SlaacPrefixFilter aFi
  * @sa otIp6RegisterMulticastListeners
  *
  */
-typedef void (*otIp6RegisterMulticastListenersCallback)(void *              aContext,
+typedef void (*otIp6RegisterMulticastListenersCallback)(void               *aContext,
                                                         otError             aError,
                                                         uint8_t             aMlrStatus,
                                                         const otIp6Address *aFailedAddresses,
@@ -810,12 +829,12 @@ typedef void (*otIp6RegisterMulticastListenersCallback)(void *              aCon
  * @sa otIp6RegisterMulticastListenersCallback
  *
  */
-otError otIp6RegisterMulticastListeners(otInstance *                            aInstance,
-                                        const otIp6Address *                    aAddresses,
+otError otIp6RegisterMulticastListeners(otInstance                             *aInstance,
+                                        const otIp6Address                     *aAddresses,
                                         uint8_t                                 aAddressNum,
-                                        const uint32_t *                        aTimeout,
+                                        const uint32_t                         *aTimeout,
                                         otIp6RegisterMulticastListenersCallback aCallback,
-                                        void *                                  aContext);
+                                        void                                   *aContext);
 
 /**
  * This function sets the Mesh Local IID (for test purpose).

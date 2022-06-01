@@ -49,6 +49,7 @@
 #include <openthread/instance.h>
 #include <openthread/ip6.h>
 #include <openthread/logging.h>
+#include <openthread/nat64.h>
 #include <openthread/openthread-system.h>
 #include <openthread/platform/time.h>
 
@@ -323,7 +324,7 @@ void virtualTimeDeinit(void);
  * @param[in]   aWriteFdSet     A pointer to the write file descriptors.
  *
  */
-void virtualTimeProcess(otInstance *  aInstance,
+void virtualTimeProcess(otInstance   *aInstance,
                         const fd_set *aReadFdSet,
                         const fd_set *aWriteFdSet,
                         const fd_set *aErrorFdSet);
@@ -339,10 +340,10 @@ void virtualTimeProcess(otInstance *  aInstance,
  * @param[in,out]  aTimeout     A pointer to the timeout.
  *
  */
-void virtualTimeUpdateFdSet(fd_set *        aReadFdSet,
-                            fd_set *        aWriteFdSet,
-                            fd_set *        aErrorFdSet,
-                            int *           aMaxFd,
+void virtualTimeUpdateFdSet(fd_set         *aReadFdSet,
+                            fd_set         *aWriteFdSet,
+                            fd_set         *aErrorFdSet,
+                            int            *aMaxFd,
                             struct timeval *aTimeout);
 
 /**
@@ -446,6 +447,11 @@ extern char gNetifName[IFNAMSIZ];
  *
  */
 extern unsigned int gNetifIndex;
+
+/**
+ * The CIDR for NAT64
+ */
+extern otIp4Cidr gNat64Cidr;
 
 /**
  * This function initializes platform Backbone network.

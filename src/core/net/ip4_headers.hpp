@@ -494,6 +494,12 @@ public:
             uint32_t m32[sizeof(uint32_t) / sizeof(uint32_t)];
         } mRestOfHeader;
     } OT_TOOL_PACKED_END;
+
+    // The maximum length of ICMP error message should not exceed 576 bytes, and an ICMP error message contains an IP4
+    // header, an ICMP4 header, and an IP4 header of original packet and the first few bytes from the original packet.
+    static constexpr uint16_t kMaxErrorMessageDataLength =
+        576 - sizeof(Ip4::Header) - sizeof(Ip4::Icmp::Header) - sizeof(Ip4::Header);
+    static constexpr uint16_t kMinErrorMessageDataLength = 8;
 };
 
 /**

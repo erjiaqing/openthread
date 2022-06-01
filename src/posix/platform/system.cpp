@@ -142,6 +142,7 @@ void platformInit(otPlatformConfig *aPlatformConfig)
 #endif
 
     gNetifName[0] = '\0';
+    gNat64Cidr = aPlatformConfig->mNat64Cidr;
 
 #if OPENTHREAD_CONFIG_PLATFORM_NETIF_ENABLE
     platformNetifInit(aPlatformConfig->mInterfaceName);

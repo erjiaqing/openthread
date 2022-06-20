@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2019, The OpenThread Authors.
+ *  Copyright (c) 2019-2022, The OpenThread Authors.
  *  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
@@ -31,11 +31,13 @@
 #include "net/ip4_address.hpp"
 #include "net/ip6_address.hpp"
 
+#include "common/encoding.hpp"
+
 #include "test_util.h"
 
 template <typename AddressType> struct TestVector
 {
-    const char *  mString;
+    const char   *mString;
     const uint8_t mAddr[sizeof(AddressType)];
     ot::Error     mError;
 };
@@ -446,6 +448,42 @@ void TestIp4Ip6Translation(void)
     }
 }
 
+void TestIp4CIDR(void)
+{
+    using ot::Encoding::BigEndian::HostSwap32;
+    struct TestCase
+    {
+        const char    *mNetwork;
+        const uint8_t  mLength;
+        const uint32_t mHost;
+        const char    *mOutcome;
+    };
+
+    const TestCase kTestCases[] = {
+        {"192.168.0.0", 24, 0xaa, "192.168.0.170"},
+        {"192.168.0.0", 24, 0xaaa, "192.168.0.170"},  // The host bits will be masked.
+        {"192.168.0.1", 24, 0xaa, "192.168.0.170"},   // The non-zero bits in the network address will be masked.
+        {"172.17.0.0", 16, 0xaacc, "172.17.170.204"}, // The host will be in host byte order.
+    };
+
+    for (const TestCase &testCase : kTestCases)
+    {
+        ot::Ip4::Address network;
+        network.FromString(testCase.mNetwork);
+        ot::Ip4::Cidr cidr;
+        cidr.mAddress = network;
+        cidr.mLength  = testCase.mLength;
+
+        ot::Ip4::Address generated = cidr.Host(testCase.mHost);
+
+        ot::Ip4::Address::InfoString hostAddress = generated.ToString();
+        printf("CIDR: %-18s HostID: %-8x Host: %-14s Expected: %s\n", cidr.ToString(), testCase.mHost,
+               hostAddress.AsCString(), testCase.mOutcome);
+
+        VerifyOrQuit(strcmp(hostAddress.AsCString(), testCase.mOutcome) == 0, "Ip4::Cidr::Host() failed");
+    }
+}
+
 int main(void)
 {
     TestIp6AddressSetPrefix();
@@ -453,6 +491,7 @@ int main(void)
     TestIp6AddressFromString();
     TestIp6Prefix();
     TestIp4Ip6Translation();
+    TestIp4CIDR();
     printf("All tests passed\n");
     return 0;
 }

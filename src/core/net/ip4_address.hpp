@@ -155,7 +155,7 @@ public:
      *
      * @returns An uint32 for the host mask, in network byte order.
      */
-    inline uint32_t HostMask() const { return HostSwap32((1 << mLength) - 1); }
+    inline uint32_t HostMask() const { return HostSwap32((uint32_t(1) << uint32_t(32 - mLength)) - 1); }
 
     /**
      * This method returns the subnet mask of the CIDR.

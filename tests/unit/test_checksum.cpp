@@ -322,7 +322,7 @@ void TestTcp4MessageChecksum(void)
 {
     enum : uint16_t
     {
-        kMinSize = sizeof(Ip4::Udp::Header),
+        kMinSize = sizeof(Ip4::Tcp::Header),
         kMaxSize = kBufferSize * 3 + 24,
     };
 
@@ -347,7 +347,7 @@ void TestTcp4MessageChecksum(void)
         VerifyOrQuit(message != nullptr, "Ip6::NewMesssage() failed");
         SuccessOrQuit(message->SetLength(size));
 
-        // Write UDP header with a random payload.
+        // Write TCP header with a random payload.
 
         Random::NonCrypto::FillBuffer(reinterpret_cast<uint8_t *>(&tcpHeader), sizeof(tcpHeader));
         message->Write(0, tcpHeader);
@@ -437,15 +437,17 @@ void TestUdp4MessageChecksum(void)
 
 void TestIcmp4MessageChecksum(void)
 {
-    // An captured ICMP echo request (ping) message.
-    const uint8_t icmpMessage[] = "\x08\x00\x55\x94\x67\x2e\x00\x00\x62\xaf\xf1\x61\x00\x04\xfc\x24"
-                                  "\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17"
-                                  "\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f\x20\x21\x22\x23\x24\x25\x26\x27"
-                                  "\x28\x29\x2a\x2b\x2c\x2d\x2e\x2f\x30\x31\x32\x33\x34\x35\x36\x37";
-    uint16_t      checksum      = HostSwap16(0x5594);
+    // An captured ICMP echo request (ping) message. Checksum field is removed.
+    const uint8_t kExampleIcmpMessage[]      = "\x08\x00\x00\x00\x67\x2e\x00\x00\x62\xaf\xf1\x61\x00\x04\xfc\x24"
+                                               "\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17"
+                                               "\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f\x20\x21\x22\x23\x24\x25\x26\x27"
+                                               "\x28\x29\x2a\x2b\x2c\x2d\x2e\x2f\x30\x31\x32\x33\x34\x35\x36\x37";
+    uint16_t      kChecksumForExampleMessage = HostSwap16(0x5594);
 
     Instance *instance = static_cast<Instance *>(testInitInstance());
-    Message  *message  = instance->Get<Ip6::Ip6>().NewMessage(icmpMessage, sizeof(icmpMessage));
+
+    Message *message = instance->Get<Ip6::Ip6>().NewMessage(sizeof(kExampleIcmpMessage));
+    message->AppendBytes(kExampleIcmpMessage, sizeof(kExampleIcmpMessage));
 
     // Random IPv4 address, ICMP message checksum does not include a presudo header like TCP and UDP.
     Ip4::Address source;
@@ -455,9 +457,12 @@ void TestIcmp4MessageChecksum(void)
 
     Checksum::UpdateMessageChecksum(*message, source, dest, Ip4::kProtoIcmp);
 
-    uint8_t mPayload[sizeof(icmpMessage)];
+    uint8_t           mPayload[sizeof(kExampleIcmpMessage)];
+    Ip4::Icmp::Header icmpHeader;
+    message->Read(0, icmpHeader);
+    VerifyOrQuit(icmpHeader.GetChecksum() == kChecksumForExampleMessage);
 
-    VerifyOrQuit(message->Read(message->GetOffset(), mPayload, sizeof(mPayload)));
+    SuccessOrQuit(message->Read(message->GetOffset(), mPayload, sizeof(mPayload)));
     VerifyOrQuit(CalculateChecksum(mPayload, sizeof(mPayload)) == 0xffff);
 }
 

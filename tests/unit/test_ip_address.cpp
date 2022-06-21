@@ -477,7 +477,7 @@ void TestIp4CIDR(void)
         ot::Ip4::Address generated = cidr.Host(testCase.mHost);
 
         ot::Ip4::Address::InfoString hostAddress = generated.ToString();
-        printf("CIDR: %-18s HostID: %-8x Host: %-14s Expected: %s\n", cidr.ToString(), testCase.mHost,
+        printf("CIDR: %-18s HostID: %-8x Host: %-14s Expected: %s\n", cidr.ToString().AsCString(), testCase.mHost,
                hostAddress.AsCString(), testCase.mOutcome);
 
         VerifyOrQuit(strcmp(hostAddress.AsCString(), testCase.mOutcome) == 0, "Ip4::Cidr::Host() failed");

@@ -37,6 +37,18 @@ using ot::Encoding::BigEndian::ReadUint16;
 namespace ot {
 namespace Ip4 {
 
+void VerifyEcnDscp(const Header &aHeader, uint8_t aDscp, Ecn aEcn)
+{
+    uint8_t  expectedDscpEcn        = static_cast<uint8_t>((aDscp << 2) + aEcn);
+
+    printf("%08x {dscp:%d, ecn:%d, flow:%d}\n", aHeader.GetDscpEcn(), aHeader.GetDscp(),
+           aHeader.GetEcn());
+
+    VerifyOrQuit(aHeader.GetDscp() == aDscp);
+    VerifyOrQuit(aHeader.GetEcn() == aEcn);
+    VerifyOrQuit(aHeader.GetDscpEcn() == expectedDscpEcn);
+}
+
 void TestIp4Header(void)
 {
     static constexpr uint16_t kTotalLength = 84;
@@ -86,6 +98,19 @@ void TestIp4Header(void)
                  "Source address is incorrect");
     VerifyOrQuit(memcmp(&headerBytes[Header::kDestinationAddressOffset], &destination, sizeof(destination)) == 0,
                  "Destination address is incorrect");
+
+    const uint8_t kDscps[] = {0x0, 0x1, 0x3, 0xf, 0x30, 0x2f, 0x3f};
+    const Ecn     kEcns[]  = {Ecn::kEcnNotCapable, Ecn::kEcnCapable0, Ecn::kEcnCapable1, Ecn::kEcnMarked};
+    for (uint8_t dscp : kDscps)
+    {
+        for (Ecn ecn : kEcns)
+        {
+            printf("Expecting {dscp:%-2d, ecn:%d} => ", dscp, ecn);
+            header.SetEcn(ecn);
+            header.SetDscp(dscp);
+            VerifyEcnDscp(header, dscp, ecn);
+        }
+    }
 
     const uint8_t kExampleIp4Header[] = "\x45\x00\x00\x54\x23\xed\x00\x00\x40\x01\x41\xd1\x0a\x00\x00\xeb"
                                         "\x0a\x00\x00\x01";

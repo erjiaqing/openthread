@@ -133,12 +133,20 @@ public:
     bool IsVersion4(void) const { return (mVersIHL & kVersionMask) == kVersion4; }
 
     /**
+     * This method returns the octet for DSCP + ECN.
+     *
+     * @retval The octet for DSCP and ECN.
+     *
+     */
+    uint8_t GetDscpEcn() const { return mDscpEcn; }
+
+    /**
      * This method gets the 6-bit Differentiated Services Code Point (DSCP) from Traffic Class field.
      *
      * @returns The DSCP value.
      *
      */
-    uint8_t GetDscp(void) const { return (mDSCP_ECN & kDscpMask) >> kDscpOffset; }
+    uint8_t GetDscp(void) const { return (mDscpEcn & kDscpMask) >> kDscpOffset; }
 
     /**
      * This method sets 6-bit Differentiated Services Code Point (DSCP) in IPv4 header.
@@ -146,7 +154,7 @@ public:
      * @param[in]  aDscp  The DSCP value.
      *
      */
-    void SetDscp(uint8_t aDscp) { mDSCP_ECN = ((mDSCP_ECN & ~kDscpMask) | (aDscp << kDscpOffset)); }
+    void SetDscp(uint8_t aDscp) { mDscpEcn = static_cast<uint8_t>((mDscpEcn & ~kDscpMask) | (aDscp << kDscpOffset)); }
 
     /**
      * This method gets the 2-bit Explicit Congestion Notification (ECN) from Traffic Class field.
@@ -154,7 +162,7 @@ public:
      * @returns The ECN value.
      *
      */
-    Ecn GetEcn(void) const { return static_cast<Ecn>(mDSCP_ECN & kEcnMask); }
+    Ecn GetEcn(void) const { return static_cast<Ecn>(mDscpEcn & kEcnMask); }
 
     /**
      * This method sets the 2-bit Explicit Congestion Notification (ECN) in IPv4 header..
@@ -162,7 +170,7 @@ public:
      * @param[in]  aEcn  The ECN value.
      *
      */
-    void SetEcn(Ecn aEcn) { mDSCP_ECN = ((mDSCP_ECN & ~kEcnMask) | aEcn); }
+    void SetEcn(Ecn aEcn) { mDscpEcn = ((mDscpEcn & ~kEcnMask) | aEcn); }
 
     /**
      * This method returns the IPv4 Payload Length value.
@@ -331,10 +339,10 @@ private:
     static constexpr uint8_t  kVersion4           = 0x40;   // Use with `mVersIHL`
     static constexpr uint8_t  kVersionMask        = 0xf0;   // Use with `mVersIHL`
     static constexpr uint8_t  kIHLMask            = 0x0f;   // Use with `mVersIHL`
-    static constexpr uint8_t  kDscpOffset         = 2;      // Use with `mDSCP_ECN`
-    static constexpr uint16_t kDscpMask           = 0xfc;   // Use with `mDSCP_ECN`
-    static constexpr uint8_t  kEcnOffset          = 0;      // Use with `mDSCP_ECN`
-    static constexpr uint8_t  kEcnMask            = 0x03;   // Use with `mDSCP_ECN`
+    static constexpr uint8_t  kDscpOffset         = 2;      // Use with `mDscpEcn`
+    static constexpr uint16_t kDscpMask           = 0xfc;   // Use with `mDscpEcn`
+    static constexpr uint8_t  kEcnOffset          = 0;      // Use with `mDscpEcn`
+    static constexpr uint8_t  kEcnMask            = 0x03;   // Use with `mDscpEcn`
     static constexpr uint16_t kFlagsMask          = 0xe000; // Use with `mFlagsFragmentOffset`
     static constexpr uint16_t kFlagsDF            = 0x4000; // Use with `mFlagsFragmentOffset`
     static constexpr uint16_t kFlagsMF            = 0x2000; // Use with `mFlagsFragmentOffset`
@@ -342,7 +350,7 @@ private:
     static constexpr uint32_t kVersIHLInit        = 0x45;   // Version 4, Header length = 5x8 bytes.
 
     uint8_t  mVersIHL;
-    uint8_t  mDSCP_ECN;
+    uint8_t  mDscpEcn;
     uint16_t mTotalLength;
     uint16_t mIdentification;
     uint16_t mFlagsFargmentOffset;
@@ -384,14 +392,64 @@ public:
             kCodeHostUnknown         = 7,
         };
 
-        Type GetType() { return static_cast<Type>(mType); }
-        Code GetCode() { return static_cast<Code>(mCode); }
+        /**
+         * This method returns the type of the ICMP message.
+         *
+         * @returns The type field of the ICMP message.
+         */
+        Type GetType() const { return static_cast<Type>(mType); }
 
+        /**
+         * This method sets the type of the ICMP message.
+         *
+         * @param[in] aType The type of the ICMP message.
+         */
         void SetType(Type aType) { mType = static_cast<uint8_t>(aType); }
+
+        /**
+         * This method returns the code of the ICMP message.
+         *
+         * @returns The code field of the ICMP message.
+         */
+        Code GetCode() const { return static_cast<Code>(mCode); }
+
+        /**
+         * This method sets the code of the ICMP message.
+         *
+         * @param[in] aCode The code of the ICMP message.
+         */
         void SetCode(Code aCode) { mCode = static_cast<uint8_t>(aCode); }
 
-        uint8_t *RestOfHeader() { return mRestOfHeader; }
-        void     SetRestOfHeader(uint8_t *restOfheader) { memcpy(mRestOfHeader, restOfheader, sizeof(mRestOfHeader)); }
+        /**
+         * This method sets the checksum field in the ICMP message.
+         *
+         * @returns The checksum of the ICMP message.
+         */
+        uint16_t GetChecksum() const { return mChecksum; }
+
+        /**
+         * This method sets the checksum field in the ICMP message.
+         *
+         * @param[in] aChecksum The checksum of the ICMP message.
+         */
+        void SetChecksum(uint16_t aChecksum) { mChecksum = aChecksum; }
+
+        /**
+         * This method returns the rest of header field in the ICMP message.
+         *
+         * @returns The rest of header field in the ICMP message. The returned buffer has 4 octets.
+         */
+        const uint8_t *GetRestOfHeader() const { return mRestOfHeader; }
+
+        /**
+         * This method sets the rest of header field in the ICMP message.
+         *
+         * @param[in] aRestOfHeader The rest of header field in the ICMP message. The buffer should have 4 octets.
+         */
+        void SetRestOfHeader(const uint8_t *aRestOfheader)
+        {
+            memcpy(mRestOfHeader, aRestOfheader, sizeof(mRestOfHeader));
+        }
 
     private:
         uint8_t  mType;

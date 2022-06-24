@@ -37,6 +37,8 @@
 
 #include "common/as_core_type.hpp"
 #include "common/locator_getters.hpp"
+#include "net/ip4_headers.hpp"
+#include "net/ip6_headers.hpp"
 #include "utils/slaac_address.hpp"
 
 using namespace ot;
@@ -139,6 +141,12 @@ otError otIp6Send(otInstance *aInstance, otMessage *aMessage)
 otMessage *otIp6NewMessage(otInstance *aInstance, const otMessageSettings *aSettings)
 {
     return AsCoreType(aInstance).Get<Ip6::Ip6>().NewMessage(0, Message::Settings::From(aSettings));
+}
+
+otMessage *otIp6NewMessageForNat64(otInstance *aInstance, const otMessageSettings *aSettings)
+{
+    return AsCoreType(aInstance).Get<Ip6::Ip6>().NewMessage(sizeof(Ip6::Header) - sizeof(Ip4::Header),
+                                                            Message::Settings::From(aSettings));
 }
 
 otMessage *otIp6NewMessageFromBuffer(otInstance *             aInstance,

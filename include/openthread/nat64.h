@@ -45,7 +45,8 @@ extern "C" {
  * @addtogroup api-nat64
  *
  * @brief This module includes functions and structs for the NAT64 function on the border router. These functions are
- * only available when `OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE` is enabled.
+ * only available when `OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE` and
+ * `OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE` is enabled.
  *
  * @{
  *
@@ -86,6 +87,36 @@ typedef struct otIp4Cidr
     otIp4Address mAddress;
     uint8_t      mLength;
 } otIp4Cidr;
+
+/**
+ * Sets the CIDR block used for the source address of the translated address.
+ *
+ * @param[in] aInstance A pointer to an OpenThread instance.
+ * @param[in] aCidr A pointer to an otIp4Cidr for the IPv4 CIDR block for NAT64.
+ *
+ * @sa otBorderRouterSend
+ * @sa otBorderRouterSetReceiveCallback
+ */
+void otBorderRouterSetIpv4CidrForNat64(otInstance *aInstance, otIp4Cidr *aCidr);
+
+/**
+ * Allocate a new message buffer for sending an IPv4 message (which will be translated into an IPv6 packet by NAT64
+ * later). Message buffers allocated by this function will have 20 bytes (The differences between the size of IPv6
+ * headers and the size of IPv4 headers) reserved.
+ *
+ * @note If @p aSettings is 'NULL', the link layer security is enabled and the message priority is set to
+ * OT_MESSAGE_PRIORITY_NORMAL by default.
+ *
+ * @param[in]  aInstance  A pointer to an OpenThread instance.
+ * @param[in]  aSettings  A pointer to the message settings or NULL to set default settings.
+ *
+ * @returns A pointer to the message buffer or NULL if no message buffers are available or parameters are invalid.
+ *
+ * @sa otMessageFree
+ * @sa otBorderRouterSend
+ *
+ */
+otMessage *otIp6NewMessageForNat64(otInstance *aInstance, const otMessageSettings *aSettings);
 
 /**
  * @}

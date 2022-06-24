@@ -177,6 +177,7 @@ SOURCES_COMMON                                  = \
     backbone_router/multicast_listeners_table.cpp \
     backbone_router/ndproxy_table.cpp             \
     border_router/infra_if.cpp                    \
+    border_router/nat64.cpp                       \
     border_router/routing_manager.cpp             \
     coap/coap.cpp                                 \
     coap/coap_message.cpp                         \
@@ -417,6 +418,7 @@ HEADERS_COMMON                                  = \
     backbone_router/multicast_listeners_table.hpp \
     backbone_router/ndproxy_table.hpp             \
     border_router/infra_if.hpp                    \
+    border_router/nat64.hpp                       \
     border_router/routing_manager.hpp             \
     coap/coap.hpp                                 \
     coap/coap_message.hpp                         \

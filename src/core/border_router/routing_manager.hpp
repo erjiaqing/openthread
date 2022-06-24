@@ -50,6 +50,7 @@
 #include <openthread/netdata.h>
 
 #include "border_router/infra_if.hpp"
+#include "border_router/nat64.hpp"
 #include "common/array.hpp"
 #include "common/error.hpp"
 #include "common/linked_list.hpp"
@@ -159,6 +160,31 @@ public:
 #endif // OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
 
     /**
+     * This function sends a Message received from the infra interface.
+     *
+     * If NAT64 is enabled, the message can be a IPv4 message (with necessary reserved room for translated IPv6 header).
+     * The aMessage will always be released even when this function returns an error.
+     *
+     * @param[in]  aMessage The message to be sent from the infra interface.
+     *
+     * @retval kErrorNone     Successfully enqueued the message into an output interface.
+     * @retval kErrorDrop     The message is dropped.
+     *
+     */
+    Error SendPacket(Message &aMessage);
+
+    /**
+     * This function sends a Message to the infra interface.
+     *
+     * If NAT64 is enabled and the destination address of the message is an NAT64-mapped address, the message will be
+     * translated to IPv4 packet before passing the infra interface. The aMessage will always be released.
+     *
+     * @param[in]  aMessage The message to be sent to the infra interface.
+     *
+     */
+    void HandleReceived(Message &aMessage);
+
+    /**
      * This method processes a received ICMPv6 message from the infrastructure interface.
      *
      * Malformed or undesired messages are dropped silently.
@@ -193,6 +219,14 @@ public:
      *
      */
     static bool IsValidOmrPrefix(const Ip6::Prefix &aOmrPrefix);
+
+    void SetInfraReceiveCallback(otIp6ReceiveCallback aCallback, void *aContext)
+    {
+        mInfraCallbackForTranslatedPacket = aCallback;
+        mInfraCallbackContext             = aContext;
+    }
+
+    static void InfraReceiveCallbackWrapper(otMessage *aMessage, void *context);
 
 private:
     typedef NetworkData::RoutePreference RoutePreference;
@@ -484,6 +518,9 @@ private:
     static bool IsValidOnLinkPrefix(const Ip6::Nd::PrefixInfoOption &aPio);
     static bool IsValidOnLinkPrefix(const Ip6::Prefix &aOnLinkPrefix);
 
+    otIp6ReceiveCallback mInfraCallbackForTranslatedPacket;
+    void *               mInfraCallbackContext;
+
     // Indicates whether the Routing Manager is running (started).
     bool mIsRunning;
 
@@ -548,6 +585,10 @@ private:
     uint8_t    mRouterSolicitCount;
 
     TimerMilli mRoutingPolicyTimer;
+
+#if OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
+    Nat64 mNat64;
+#endif // OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
 };
 
 } // namespace BorderRouter

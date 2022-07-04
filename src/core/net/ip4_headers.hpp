@@ -385,22 +385,35 @@ public:
         enum Type : uint8_t
         {
             kTypeEchoReply              = 0,
-            kTypeDestinationUnreachable = 1,
+            kTypeDestinationUnreachable = 3,
             kTypeEchoRequest            = 8,
             kTypeTimeExceeded           = 11,
+            kTypeParameterProblem       = 12,
         };
 
         enum Code : uint8_t
         {
             kCodeNone = 0,
             // Destination Unreachable codes
-            kCodeNetworkUnreachable  = 0,
-            kCodeHostUnreachable     = 1,
-            kCodeProtocolUnreachable = 2,
-            kCodePortUnreachable     = 3,
-            kCodeSourceRouteFailed   = 5,
-            kCodeNetworkUnknown      = 6,
-            kCodeHostUnknown         = 7,
+            kCodeNetworkUnreachable                      = 0,
+            kCodeHostUnreachable                         = 1,
+            kCodeProtocolUnreachable                     = 2,
+            kCodePortUnreachable                         = 3,
+            kCodeFragmentationNeeded                     = 4,
+            kCodeSourceRouteFailed                       = 5,
+            kCodeNetworkUnknown                          = 6,
+            kCodeHostUnknown                             = 7,
+            kCodeSourceHostIsolated                      = 8,
+            kCodeDestHostAdministrativelyProhibited      = 9,
+            kCodeDestNetworkAdministrativelyProhibited   = 10,
+            kCodeNetworkUnreachableForTos                = 11,
+            kCodeHostUnreachableForTos                   = 12,
+            kCodeCommunicationAdministrativelyProhibited = 13,
+            kCodeHostPrecedenceViolation                 = 14,
+            kCodePrecedenceCutoff                        = 15,
+            // Parameter Problem codes
+            kCodePointerIndicated = 0,
+            kCodeBadLength        = 2,
         };
 
         /**
@@ -457,7 +470,7 @@ public:
          * @returns The rest of header field in the ICMP message. The returned buffer has 4 octets.
          *
          */
-        const uint8_t *GetRestOfHeader(void) const { return mRestOfHeader; }
+        const uint8_t *GetRestOfHeader(void) const { return mRestOfHeader.m8; }
 
         /**
          * This method sets the rest of header field in the ICMP message.
@@ -467,14 +480,19 @@ public:
          */
         void SetRestOfHeader(const uint8_t *aRestOfheader)
         {
-            memcpy(mRestOfHeader, aRestOfheader, sizeof(mRestOfHeader));
+            memcpy(mRestOfHeader.m8, aRestOfheader, sizeof(mRestOfHeader));
         }
 
-    private:
         uint8_t  mType;
         uint8_t  mCode;
         uint16_t mChecksum;
-        uint8_t  mRestOfHeader[4];
+
+        union
+        {
+            uint8_t  m8[sizeof(uint32_t) / sizeof(uint8_t)];
+            uint16_t m16[sizeof(uint32_t) / sizeof(uint16_t)];
+            uint32_t m32[sizeof(uint32_t) / sizeof(uint32_t)];
+        } mRestOfHeader;
     } OT_TOOL_PACKED_END;
 };
 

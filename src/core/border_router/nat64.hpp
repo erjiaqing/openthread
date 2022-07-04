@@ -37,7 +37,7 @@
 
 #include "openthread-core-config.h"
 
-#if OPENTHREAD_CONFIG_BORDER_ROUTING_ENABLE && OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
+// #if OPENTHREAD_CONFIG_BORDER_ROUTING_ENABLE && OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
 
 #include "common/linked_list.hpp"
 #include "common/pool.hpp"
@@ -60,6 +60,10 @@ public:
     static constexpr uint32_t kAddressMappingIdleTimeoutMsec =
         OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_IDLE_TIMEOUT_SECONDS * Time::kOneSecondInMsec;
     static constexpr uint32_t kAddressMappingPoolSize = OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_MAX_MAPPINGS;
+
+    // Payload of ICMP4 is the original IP4 header plus 8 octets of the IP payload of the original packet.
+    static constexpr size_t kIpPayloadInIcmp4 = 8;
+    static constexpr size_t kIcmp4PayloadSize = sizeof(Ip4::Header) + kIpPayloadInIcmp4;
 
     enum class Result : uint8_t
     {
@@ -157,6 +161,19 @@ private:
     Pool<AddressMapping, kAddressMappingPoolSize> mAddressMappingPool;
     LinkedList<AddressMapping>                    mActiveAddressMappings;
 
+    static uint16_t ChecksumAdd(uint16_t aOriginal, const void *aBuf, uint16_t aLength);
+    static uint16_t ChecksumSubtract(uint16_t aOriginal, const void *aBuf, uint16_t aLength);
+
+    /**
+     * @brief Translates the ICMPv4 payload (IPv4 header + first 8 bytes of the message) to ICMP6 payload.
+     *
+     * @param[in] aMapping the address mapping for translating the IP header in the ICMP message.
+     * @param[in,out] aMessage the message containing the ICMPv4 payload to be translated, and the translated ICMPv6
+     * payload.
+     *
+     */
+    Result TranslateIcmp4Payload(const AddressMapping &aMapping, Message &aMessage);
+
     /**
      * @brief Translates an ICMPv4 error message into a corresponding ICMPv6 error message. It will rebuild a new
      * message.
@@ -169,7 +186,7 @@ private:
      * @returns Result::kDrop the packet should be dropped.
      *
      */
-    Result TranslateIcmp4(const AddressMapping *aMapping, Message &aMessage);
+    Result TranslateIcmp4(const AddressMapping &aMapping, Message &aMessage);
 
     /**
      * @brief Translates an ICMPv6 error message into a corresponding ICMPv4 error message. It will rebuild a new
@@ -233,6 +250,6 @@ private:
 } // namespace BorderRouter
 } // namespace ot
 
-#endif // OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
+// #endif // OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
 
 #endif // NAT64_HPP_

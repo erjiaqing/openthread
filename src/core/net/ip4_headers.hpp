@@ -99,6 +99,8 @@ public:
     static constexpr uint8_t kSourceAddressOffset      = 12;
     static constexpr uint8_t kDestinationAddressOffset = 16;
 
+    static constexpr uint8_t kDefaultIhl = 5; /// An IPv4 header without any extension fields has 5 * 4 = 20 bytes.
+
     /**
      * This method indicates whether or not the header appears to be well-formed.
      *
@@ -122,6 +124,15 @@ public:
      * @param[in] aVersionIhl The octet for the version and Ihl field.
      */
     void SetVersionIhl(uint8_t aVersionIhl) { mVersIhl = aVersionIhl; }
+
+
+    /**
+     * This method returns the header length of the IPv4 header.
+     *
+     * @retval The IP header length. In the number of 32-bit words.
+     *
+     */
+    uint8_t GetIhl(void) const { return mVersIhl & kIhlMask; }
 
     /**
      * This method indicates whether or not the IPv4 Version is set to 6.
@@ -385,22 +396,35 @@ public:
         enum Type : uint8_t
         {
             kTypeEchoReply              = 0,
-            kTypeDestinationUnreachable = 1,
+            kTypeDestinationUnreachable = 3,
             kTypeEchoRequest            = 8,
             kTypeTimeExceeded           = 11,
+            kTypeParameterProblem       = 12,
         };
 
         enum Code : uint8_t
         {
             kCodeNone = 0,
             // Destination Unreachable codes
-            kCodeNetworkUnreachable  = 0,
-            kCodeHostUnreachable     = 1,
-            kCodeProtocolUnreachable = 2,
-            kCodePortUnreachable     = 3,
-            kCodeSourceRouteFailed   = 5,
-            kCodeNetworkUnknown      = 6,
-            kCodeHostUnknown         = 7,
+            kCodeNetworkUnreachable                      = 0,
+            kCodeHostUnreachable                         = 1,
+            kCodeProtocolUnreachable                     = 2,
+            kCodePortUnreachable                         = 3,
+            kCodeFragmentationNeeded                     = 4,
+            kCodeSourceRouteFailed                       = 5,
+            kCodeNetworkUnknown                          = 6,
+            kCodeHostUnknown                             = 7,
+            kCodeSourceHostIsolated                      = 8,
+            kCodeDestHostAdministrativelyProhibited      = 9,
+            kCodeDestNetworkAdministrativelyProhibited   = 10,
+            kCodeNetworkUnreachableForTos                = 11,
+            kCodeHostUnreachableForTos                   = 12,
+            kCodeCommunicationAdministrativelyProhibited = 13,
+            kCodeHostPrecedenceViolation                 = 14,
+            kCodePrecedenceCutoff                        = 15,
+            // Parameter Problem codes
+            kCodePointerIndicated = 0,
+            kCodeBadLength        = 2,
         };
 
         /**
@@ -457,7 +481,7 @@ public:
          * @returns The rest of header field in the ICMP message. The returned buffer has 4 octets.
          *
          */
-        const uint8_t *GetRestOfHeader(void) const { return mRestOfHeader; }
+        const uint8_t *GetRestOfHeader(void) const { return mRestOfHeader.m8; }
 
         /**
          * This method sets the rest of header field in the ICMP message.
@@ -467,15 +491,26 @@ public:
          */
         void SetRestOfHeader(const uint8_t *aRestOfheader)
         {
-            memcpy(mRestOfHeader, aRestOfheader, sizeof(mRestOfHeader));
+            memcpy(mRestOfHeader.m8, aRestOfheader, sizeof(mRestOfHeader));
         }
 
-    private:
         uint8_t  mType;
         uint8_t  mCode;
         uint16_t mChecksum;
-        uint8_t  mRestOfHeader[4];
+
+        union
+        {
+            uint8_t  m8[sizeof(uint32_t) / sizeof(uint8_t)];
+            uint16_t m16[sizeof(uint32_t) / sizeof(uint16_t)];
+            uint32_t m32[sizeof(uint32_t) / sizeof(uint32_t)];
+        } mRestOfHeader;
     } OT_TOOL_PACKED_END;
+
+    // The maximum length of ICMP error message should not exceed 576 bytes, and an ICMP error message contains an IP4
+    // header, an ICMP4 header, and an IP4 header of original packet and the first few bytes from the original packet.
+    static constexpr uint16_t kMaxErrorMessageDataLength =
+        576 - sizeof(Ip4::Header) - sizeof(Ip4::Icmp::Header) - sizeof(Ip4::Header);
+    static constexpr uint16_t kMinErrorMessageDataLength = 8;
 };
 
 /**

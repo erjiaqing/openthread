@@ -98,8 +98,13 @@ public:
          */
         enum Code : uint8_t
         {
+            kCodeZero              = 0,
             kCodeDstUnreachNoRoute = OT_ICMP6_CODE_DST_UNREACH_NO_ROUTE, ///< Destination Unreachable No Route
-            kCodeFragmReasTimeEx   = OT_ICMP6_CODE_FRAGM_REAS_TIME_EX,   ///< Fragment Reassembly Time Exceeded
+            kCodeDstUnreachAdministrativelyProhibited = 1,
+            kCodeDstUnreachPortUnreach                = 4,
+            kCodeFragmReasTimeEx = OT_ICMP6_CODE_FRAGM_REAS_TIME_EX, ///< Fragment Reassembly Time Exceeded
+            kCodeParameterProblemErroneousHeaderField   = 0,
+            kCodeParameterProblemUnrecognizedNextHeader = 1,
         };
 
         static constexpr uint8_t kTypeFieldOffset     = 0; ///< The byte offset of Type field in ICMP6 header.

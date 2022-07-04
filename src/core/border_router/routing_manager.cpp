@@ -1982,7 +1982,7 @@ void RoutingManager::HandleReceived(Message &message)
     bool          freed = false;
     Nat64::Result res;
 
-    VerifyOrExit(mInfraCallbackForTranslatedPacket == nullptr);
+    VerifyOrExit(mInfraCallbackForTranslatedPacket != nullptr);
 
     res = mNat64.HandleOutgoing(message);
     VerifyOrExit(res == Nat64::Result::kForward);
@@ -2005,6 +2005,7 @@ Error RoutingManager::SendPacket(Message &message)
 
 void RoutingManager::HandleReceived(Message &message)
 {
+    #error ohno
     mInfraCallbackForTranslatedPacket(&message, mInfraCallbackContext);
 }
 #endif

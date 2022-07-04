@@ -61,6 +61,10 @@ public:
         OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_IDLE_TIMEOUT_SECONDS * Time::kOneSecondInMsec;
     static constexpr uint32_t kAddressMappingPoolSize = OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_MAX_MAPPINGS;
 
+    // Payload of ICMP4 is the original IP4 header plus 8 octets of the IP payload of the original packet.
+    static constexpr size_t kIpPayloadInIcmp4 = 8;
+    static constexpr size_t kIcmp4PayloadSize = sizeof(Ip4::Header) + kIpPayloadInIcmp4;
+
     enum class Result : uint8_t
     {
         kForward   = 0,
@@ -158,6 +162,50 @@ private:
     LinkedList<AddressMapping>                    mActiveAddressMappings;
 
     /**
+     * @brief Translates the ICMP4 payload (IPv4 header + first 8 bytes of the message) to ICMP6 payload.
+     *
+     * @param[in] aMapping the address mapping for translating the IP header in the ICMP message.
+     * @param[in,out] aMessage the message containing the ICMPv4 payload to be translated, and the translated ICMPv6
+     * payload.
+     *
+     */
+    Error TranslateIcmp4Payload(const AddressMapping &aMapping, Message &aMessage);
+
+    /**
+     * @brief Translates the ICMP6 payload (IPv6 header + first few bytes of the message) to ICMP4 payload.
+     *
+     * @param[in] aMapping the address mapping for translating the IP header in the ICMP message.
+     * @param[in,out] aMessage the message containing the ICMPv4 payload to be translated, and the translated ICMPv6
+     * payload.
+     *
+     */
+    Error TranslateIcmp6Payload(const AddressMapping &aMapping, Message &aMessage);
+
+    /**
+     * @brief Translates the IPv4 packet header into IPv6 packet header. The destination address in the IPv4 header must match the IPv4 address in the mapping record.
+     *
+     * @param[in] aMapping the address mapping for translating the IP address.
+     * @param[in] aIp4Header the IPv4 header.
+     * @param[out] aIp6Header the IPv6 header.
+     * @returns kErrorNone the packet is translated without any errors.
+     * @returns kErrorDrop the destination address in the IPv4 header does not match the IPv4 address in the aMapping.
+     *
+     */
+    Error TranslateIp4Header(const AddressMapping &aMapping, const Ip4::Header & aIp4Header, Ip6::Header & aIp6Header);
+
+    /**
+     * @brief Translates the IPv4 packet header into IPv6 packet header. The source address in the IPv6 header must match the IPv6 address in the mapping record.
+     *
+     * @param[in] aMapping the address mapping for translating the IP address.
+     * @param[in] aIp6Header the IPv4 header.
+     * @param[out] aIp4Header the IPv6 header.
+     * @returns kErrorNone the packet is translated without any errors.
+     * @returns kErrorDrop the source address in the IPv6 header does not match the IPv6 address in the aMapping.
+     *
+     */
+    Error TranslateIp6Header(const AddressMapping &aMapping, const Ip6::Header & aIp6Header, Ip4::Header & aIp4Header);
+
+    /**
      * @brief Translates an ICMPv4 error message into a corresponding ICMPv6 error message. It will rebuild a new
      * message.
      *
@@ -165,11 +213,11 @@ private:
      * @param[in,out] aMessage the message containing the ICMPv4 packet to be translated, and the translated ICMPv6
      * packet.
      *
-     * @returns Result::kForward the packet is translated successfully.
-     * @returns Result::kDrop the packet should be dropped.
+     * @returns kErrorNone the packet is translated successfully.
+     * @returns kErrorDrop the packet should be dropped.
      *
      */
-    Result TranslateIcmp4(const AddressMapping *aMapping, Message &aMessage);
+    Error TranslateIcmp4(const AddressMapping &aMapping, Message &aMessage);
 
     /**
      * @brief Translates an ICMPv6 error message into a corresponding ICMPv4 error message. It will rebuild a new
@@ -179,11 +227,11 @@ private:
      * @param[in,out] aMessage the message containing the ICMPv6 packet to be translated, and the translated ICMPv4
      * packet.
      *
-     * @returns Result::kForward the packet is translated successfully.
-     * @returns Result::kDrop the packet should be dropped.
+     * @returns kErrorNone the packet is translated successfully.
+     * @returns kErrorDrop the packet should be dropped.
      *
      */
-    Result TranslateIcmp6(const AddressMapping *aMapping, Message &aMessage);
+    Error TranslateIcmp6(const AddressMapping &aMapping, Message &aMessage);
 
     /**
      * @brief This function will release the given mapping including the allocated IPv4 address.

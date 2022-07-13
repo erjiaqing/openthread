@@ -140,10 +140,10 @@ extern int
 #include <openthread/border_router.h>
 #include <openthread/icmp6.h>
 #include <openthread/instance.h>
-#include <openthread/nat64.h>
 #include <openthread/ip6.h>
 #include <openthread/logging.h>
 #include <openthread/message.h>
+#include <openthread/nat64.h>
 #include <openthread/netdata.h>
 #include <openthread/platform/misc.h>
 
@@ -937,7 +937,7 @@ static void processReceive(otMessage *aMessage, void *aContext)
     OT_UNUSED_VARIABLE(aContext);
 
     char     packetBuffer[kMaxIp6Size + 4 + kIP4IP6HeaderLengthDiff];
-    char    *packet    = &packetBuffer[kIP4IP6HeaderLengthDiff];
+    char *   packet    = &packetBuffer[kIP4IP6HeaderLengthDiff];
     otError  error     = OT_ERROR_NONE;
     uint16_t length    = otMessageGetLength(aMessage);
     uint16_t maxLength = sizeof(packetBuffer) - 4;
@@ -1051,10 +1051,10 @@ static void logAddrEvent(bool isAdd, const ot::Ip6::Address &aAddress, otError e
     {
         otLogInfoPlat("[netif] %s [%s] %s%s", isAdd ? "ADD" : "DEL", aAddress.IsMulticast() ? "M" : "U",
                       aAddress.ToString().AsCString(),
-                      error == OT_ERROR_ALREADY     ? " (already subscribed, ignored)"
-                      : error == OT_ERROR_REJECTED  ? " (rejected)"
-                      : error == OT_ERROR_NOT_FOUND ? " (not found, ignored)"
-                                                    : "");
+                      error == OT_ERROR_ALREADY
+                          ? " (already subscribed, ignored)"
+                          : error == OT_ERROR_REJECTED ? " (rejected)"
+                                                       : error == OT_ERROR_NOT_FOUND ? " (not found, ignored)" : "");
     }
     else
     {
@@ -1067,7 +1067,7 @@ static void logAddrEvent(bool isAdd, const ot::Ip6::Address &aAddress, otError e
 
 static void processNetifAddrEvent(otInstance *aInstance, struct nlmsghdr *aNetlinkMessage)
 {
-    struct ifaddrmsg   *ifaddr = reinterpret_cast<struct ifaddrmsg *>(NLMSG_DATA(aNetlinkMessage));
+    struct ifaddrmsg *  ifaddr = reinterpret_cast<struct ifaddrmsg *>(NLMSG_DATA(aNetlinkMessage));
     size_t              rtaLength;
     otError             error = OT_ERROR_NONE;
     struct sockaddr_in6 addr6;
@@ -1238,7 +1238,7 @@ static void processNetifAddrEvent(otInstance *aInstance, struct rt_msghdr *rtm)
     uint8_t *           addrbuf;
     unsigned int        addrmask = 0;
     unsigned int        i;
-    struct sockaddr    *sa;
+    struct sockaddr *   sa;
     bool                is_link_local;
 
     addr6.sin6_family   = 0;
@@ -1559,10 +1559,10 @@ static void processMLDEvent(otInstance *aInstance)
     struct sockaddr_in6 srcAddr;
     socklen_t           addrLen  = sizeof(srcAddr);
     bool                fromSelf = false;
-    MLDv2Header        *hdr      = reinterpret_cast<MLDv2Header *>(buffer);
+    MLDv2Header *       hdr      = reinterpret_cast<MLDv2Header *>(buffer);
     size_t              offset;
     uint8_t             type;
-    struct ifaddrs     *ifAddrs = nullptr;
+    struct ifaddrs *    ifAddrs = nullptr;
     char                addressString[INET6_ADDRSTRLEN + 1];
 
     bufferLen = recvfrom(sMLDMonitorFd, buffer, sizeof(buffer), 0, reinterpret_cast<sockaddr *>(&srcAddr), &addrLen);

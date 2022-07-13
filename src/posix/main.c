@@ -56,8 +56,8 @@
 
 #include <openthread/cli.h>
 #include <openthread/diag.h>
-#include <openthread/nat64.h>
 #include <openthread/logging.h>
+#include <openthread/nat64.h>
 #include <openthread/tasklet.h>
 #include <openthread/thread.h>
 #include <openthread/platform/radio.h>
@@ -264,20 +264,6 @@ static void ParseArg(int aArgCount, char *aArgVector[], PosixConfig *aConfig)
             }
             break;
 #endif // __linux__
-#if OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
-        case OT_POSIX_OPT_NAT64_CIDR:
-            if ((sscanf(optarg, "%" SCNu8 ".%" SCNu8 ".%" SCNu8 ".%" SCNu8 "/%" SCNu8,
-                        &aConfig->mPlatformConfig.mNat64Cidr.mAddress.mFields.m8[0],
-                        &aConfig->mPlatformConfig.mNat64Cidr.mAddress.mFields.m8[1],
-                        &aConfig->mPlatformConfig.mNat64Cidr.mAddress.mFields.m8[2],
-                        &aConfig->mPlatformConfig.mNat64Cidr.mAddress.mFields.m8[3],
-                        &aConfig->mPlatformConfig.mNat64Cidr.mLength)) != 5)
-            {
-                fprintf(stderr, "Invalid value for NAT64 CIDR: %s\n", optarg);
-                exit(OT_EXIT_INVALID_ARGUMENTS);
-            }
-            break;
-#endif
         case '?':
             PrintUsage(aArgVector[0], stderr, OT_EXIT_INVALID_ARGUMENTS);
             break;

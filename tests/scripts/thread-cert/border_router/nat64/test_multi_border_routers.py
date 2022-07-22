@@ -51,6 +51,8 @@ ROUTER = 2
 BR2 = 3
 HOST = 4
 
+NAT64_PREFIX_REFRESH_DELAY = 305
+
 
 class Nat64MultiBorderRouter(thread_cert.TestCase):
     USE_MESSAGE_FACTORY = False
@@ -91,7 +93,7 @@ class Nat64MultiBorderRouter(thread_cert.TestCase):
         br1.start()
         self.simulator.go(config.LEADER_STARTUP_DELAY)
         br1.bash("service bind9 stop")
-        self.simulator.go(330)
+        self.simulator.go(NAT64_PREFIX_REFRESH_DELAY)
         self.assertEqual('leader', br1.get_state())
 
         router.start()
@@ -104,7 +106,7 @@ class Nat64MultiBorderRouter(thread_cert.TestCase):
         #
         br2.start()
         br2.bash("service bind9 stop")
-        self.simulator.go(330)
+        self.simulator.go(NAT64_PREFIX_REFRESH_DELAY)
         self.assertEqual('router', br2.get_state())
 
         # Only 1 NAT64 prefix in Network Data.

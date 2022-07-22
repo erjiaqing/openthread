@@ -188,18 +188,19 @@ public:
 
 #if OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
     /**
-     * This method returns the infrastructure or local NAT64 prefix.
+     * This method returns the infrastructure or local NAT64 prefix and its route preference.
      *
      * The NAT64 prefix will be published in the Thread network
      * if none exists.
      *
-     * @param[out]  aPrefix  A reference to where the prefix will be output to.
+     * @param[out]  aPrefix           A reference to where the prefix will be output to.
+     * @param[out]  aRoutePreference  A pointer to where the preference will be output to.
      *
      * @retval  kErrorInvalidState  The Border Routing Manager is not initialized yet.
      * @retval  kErrorNone          Successfully retrieved the NAT64 prefix.
      *
      */
-    Error GetNat64Prefix(Ip6::Prefix &aPrefix);
+    Error GetNat64Prefix(Ip6::Prefix &aPrefix, RoutePreference *aRoutePreference = nullptr);
 #endif // OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
 
     /**

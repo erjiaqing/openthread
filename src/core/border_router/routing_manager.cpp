@@ -187,12 +187,17 @@ exit:
 }
 
 #if OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
-Error RoutingManager::GetNat64Prefix(Ip6::Prefix &aPrefix)
+Error RoutingManager::GetNat64Prefix(Ip6::Prefix &aPrefix, RoutePreference *aRoutePreference)
 {
     Error error = kErrorNone;
 
     VerifyOrExit(IsInitialized(), error = kErrorInvalidState);
     aPrefix = mInfraIfNat64Prefix.IsValidNat64() ? mInfraIfNat64Prefix : mLocalNat64Prefix;
+    if (aRoutePreference != nullptr)
+    {
+        *aRoutePreference =
+            mInfraIfNat64Prefix.IsValidNat64() ? NetworkData::kRoutePreferenceMedium : NetworkData::kRoutePreferenceLow;
+    }
 
 exit:
     return error;
@@ -700,76 +705,38 @@ void RoutingManager::EvaluateNat64Prefix(void)
 {
     OT_ASSERT(mIsRunning);
 
+    Ip6::Prefix                      nat64Prefix;
+    RoutePreference                  routePreference;
     Error                            error;
     NetworkData::ExternalRouteConfig preferredNat64PrefixConfig;
+    bool                             shouldAdvertise;
 
     LogInfo("Evaluating NAT64 prefix");
 
+    VerifyOrExit(GetNat64Prefix(nat64Prefix, &routePreference) == kErrorNone);
     error = Get<NetworkData::Leader>().GetPreferredNat64Prefix(preferredNat64PrefixConfig);
 
-    // (Re)advertise NAT64 prefix from this BR when
+    // NAT64 prefix is expected to be advertised from this BR when
     // - no NAT64 prefix exits in Network Data yet
     // - the preferred NAT64 prefix in Network Data was advertised by this BR
-    if (error == kErrorNotFound || preferredNat64PrefixConfig.GetPrefix() == mAdvertisedNat64Prefix)
+    // - the preferred NAT64 prefix in Network Data is same as the infrastructure prefix
+    // TODO: change to check RLOC16 to determine if the NAT64 prefix was advertised by this BR
+    shouldAdvertise = (error == kErrorNotFound || preferredNat64PrefixConfig.GetPrefix() == mAdvertisedNat64Prefix ||
+                       preferredNat64PrefixConfig.GetPrefix() == mInfraIfNat64Prefix);
+
+    if (mAdvertisedNat64Prefix.IsValidNat64() && (!shouldAdvertise || nat64Prefix != mAdvertisedNat64Prefix))
     {
-        // Withdraw the legacy infrastructure NAT64 prefix if a new one is provided.
-        if (mAdvertisedNat64Prefix.IsValidNat64() && mAdvertisedNat64Prefix != mLocalNat64Prefix &&
-            (mAdvertisedNat64Prefix != mInfraIfNat64Prefix || !mInfraIfNat64Prefix.IsValidNat64()))
-        {
-            LogNote("Withdrawing legacy infrastructure NAT64 prefix %s", mAdvertisedNat64Prefix.ToString().AsCString());
-            UnpublishExternalRoute(mAdvertisedNat64Prefix);
-            mAdvertisedNat64Prefix.Clear();
-        }
-
-        // Try to (re)advertise the (higher-preference) infrastructure NAT64 prefix if it exists.
-        if ((!mAdvertisedNat64Prefix.IsValidNat64() || mAdvertisedNat64Prefix == mLocalNat64Prefix) &&
-            mInfraIfNat64Prefix.IsValidNat64() &&
-            PublishExternalRoute(mInfraIfNat64Prefix, NetworkData::kRoutePreferenceMedium, /* aNat64= */ true) ==
-                kErrorNone)
-        {
-            LogInfo("Advertising infrastructure NAT64 prefix %s", mInfraIfNat64Prefix.ToString().AsCString());
-            if (mAdvertisedNat64Prefix == mLocalNat64Prefix)
-            {
-                LogNote("Withdrawing local NAT64 prefix %s", mLocalNat64Prefix.ToString().AsCString());
-                UnpublishExternalRoute(mLocalNat64Prefix);
-            }
-            mAdvertisedNat64Prefix = mInfraIfNat64Prefix;
-        }
-
-        // Try to advertise the local generated NAT64 prefix if no infrastructure prefix is advertised.
-        if (!mAdvertisedNat64Prefix.IsValidNat64() &&
-            PublishExternalRoute(mLocalNat64Prefix, NetworkData::kRoutePreferenceLow, /* aNat64= */ true) == kErrorNone)
-        {
-            LogInfo("Advertising local prefix %s", mLocalNat64Prefix.ToString().AsCString());
-            mAdvertisedNat64Prefix = mLocalNat64Prefix;
-        }
-    }
-    // Withdraw infrastructure NAT64 prefix if a smaller one of medium preference exists in Network Data.
-    else if (mAdvertisedNat64Prefix.IsValidNat64() && mAdvertisedNat64Prefix != mLocalNat64Prefix &&
-             (preferredNat64PrefixConfig.mPreference == NetworkData::kRoutePreferenceMedium &&
-              preferredNat64PrefixConfig.GetPrefix() < mAdvertisedNat64Prefix))
-    {
-        LogNote("Withdrawing infrastructure NAT64 prefix since a smaller one %s in medium preference exists.",
-                preferredNat64PrefixConfig.GetPrefix().ToString().AsCString());
-
         UnpublishExternalRoute(mAdvertisedNat64Prefix);
         mAdvertisedNat64Prefix.Clear();
     }
-    // Withdraw local NAT64 prefix if any of the following case exists in Network Data
-    // - a prefix of medium preference
-    // - OR a smaller one of low preference
-    else if (mAdvertisedNat64Prefix == mLocalNat64Prefix &&
-             (preferredNat64PrefixConfig.mPreference == NetworkData::kRoutePreferenceMedium ||
-              (preferredNat64PrefixConfig.mPreference == NetworkData::kRoutePreferenceLow &&
-               preferredNat64PrefixConfig.GetPrefix() < mLocalNat64Prefix)))
+    if (shouldAdvertise && nat64Prefix != mAdvertisedNat64Prefix &&
+        PublishExternalRoute(nat64Prefix, routePreference, /* aNat64= */ true) == kErrorNone)
     {
-        // Withdraw local NAT64 prefix if it's not the smallest one in Network Data.
-        LogNote("Withdrawing local NAT64 prefix since a more preferred one %s exists.",
-                preferredNat64PrefixConfig.GetPrefix().ToString().AsCString());
-
-        UnpublishExternalRoute(mLocalNat64Prefix);
-        mAdvertisedNat64Prefix.Clear();
+        mAdvertisedNat64Prefix = nat64Prefix;
     }
+
+exit:
+    return;
 }
 #endif
 

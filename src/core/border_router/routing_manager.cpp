@@ -346,6 +346,7 @@ void RoutingManager::Stop(void)
         UnpublishExternalRoute(mAdvertisedNat64Prefix);
     }
     mAdvertisedNat64Prefix.Clear();
+    mInfraIfNat64Prefix.Clear();
     mInfraIfNat64PrefixStaleTimer.Stop();
 #endif
     // Use empty OMR & on-link prefixes to invalidate possible advertised prefixes.
@@ -718,10 +719,12 @@ void RoutingManager::EvaluateNat64Prefix(void)
 
     // NAT64 prefix is expected to be advertised from this BR when
     // - no NAT64 prefix exits in Network Data yet
+    // - the preferred NAT64 prefix in Network Data has lower preference than this BR's prefix
     // - the preferred NAT64 prefix in Network Data was advertised by this BR
     // - the preferred NAT64 prefix in Network Data is same as the infrastructure prefix
     // TODO: change to check RLOC16 to determine if the NAT64 prefix was advertised by this BR
-    shouldAdvertise = (error == kErrorNotFound || preferredNat64PrefixConfig.GetPrefix() == mAdvertisedNat64Prefix ||
+    shouldAdvertise = (error == kErrorNotFound || preferredNat64PrefixConfig.mPreference < routePreference ||
+                       preferredNat64PrefixConfig.GetPrefix() == mAdvertisedNat64Prefix ||
                        preferredNat64PrefixConfig.GetPrefix() == mInfraIfNat64Prefix);
 
     if (mAdvertisedNat64Prefix.IsValidNat64() && (!shouldAdvertise || nat64Prefix != mAdvertisedNat64Prefix))

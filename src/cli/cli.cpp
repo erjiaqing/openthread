@@ -53,6 +53,9 @@
 #endif
 #if OPENTHREAD_CONFIG_BORDER_ROUTER_ENABLE
 #include <openthread/border_router.h>
+#if OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
+#include <openthread/nat64.h>
+#endif
 #endif
 #if OPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE
 #include <openthread/server.h>
@@ -585,25 +588,6 @@ template <> otError Interpreter::Process<Cmd("br")>(Arg aArgs[])
         SuccessOrExit(error = otBorderRoutingGetOnLinkPrefix(GetInstancePtr(), &onLinkPrefix));
         OutputIp6PrefixLine(onLinkPrefix);
     }
-#if OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
-    /**
-     * @cli br nat64prefix
-     * @code
-     * br nat64prefix
-     * fd14:1078:b3d5:b0b0:0:0::/96
-     * Done
-     * @endcode
-     * @par api_copy
-     * #otBorderRoutingGetNat64Prefix
-     */
-    else if (aArgs[0] == "nat64prefix")
-    {
-        otIp6Prefix nat64Prefix;
-
-        SuccessOrExit(error = otBorderRoutingGetNat64Prefix(GetInstancePtr(), &nat64Prefix));
-        OutputIp6PrefixLine(nat64Prefix);
-    }
-#endif // OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
     /**
      * @cli br rioprf (high,med,low)
      * @code
@@ -684,6 +668,64 @@ template <> otError Interpreter::Process<Cmd("br")>(Arg aArgs[])
 exit:
     return error;
 }
+
+#if OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
+template <> otError Interpreter::Process<Cmd("nat64")>(Arg aArgs[])
+{
+    otError error = OT_ERROR_INVALID_COMMAND;
+
+    /**
+     * @cli nat64 prefix
+     * @code
+     * br nat64prefix
+     * fd14:1078:b3d5:b0b0:0:0::/96
+     * Done
+     * @endcode
+     * @par api_copy
+     * #otBorderRoutingGetNat64Prefix
+     */
+    if (aArgs[0] == "prefix")
+    {
+        otIp6Prefix nat64Prefix;
+
+        SuccessOrExit(error = otBorderRoutingGetNat64Prefix(GetInstancePtr(), &nat64Prefix));
+        OutputIp6PrefixLine(nat64Prefix);
+    }
+    else if (aArgs[0] == "state")
+    {
+        otNat64State state = otNat64GetState(GetInstancePtr());
+        switch (state)
+        {
+        case OT_NAT64_DISABLED:
+            OutputLine("disabled");
+            break;
+        case OT_NAT64_IDLE:
+            OutputLine("disabled");
+            break;
+        case OT_NAT64_ACTIVE:
+            OutputLine("active");
+            break;
+        default:
+            OutputLine("unknown");
+            break;
+        }
+        error = OT_ERROR_NONE;
+    }
+    else if (aArgs[0] == "disable")
+    {
+        otNat64SetEnabled(GetInstancePtr(), false);
+        error = OT_ERROR_NONE;
+    }
+    else if (aArgs[0] == "enable")
+    {
+        otNat64SetEnabled(GetInstancePtr(), true);
+        error = OT_ERROR_NONE;
+    }
+
+exit:
+    return error;
+}
+#endif // OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
 #endif // OPENTHREAD_CONFIG_BORDER_ROUTING_ENABLE
 
 #if (OPENTHREAD_CONFIG_THREAD_VERSION >= OT_THREAD_VERSION_1_2)
@@ -5363,6 +5405,9 @@ otError Interpreter::ProcessCommand(Arg aArgs[])
 #endif
         CmdEntry("mode"),
         CmdEntry("multiradio"),
+#if OPENTHREAD_CONFIG_BORDER_ROUTING_ENABLE && OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
+        CmdEntry("nat64"),
+#endif
 #if OPENTHREAD_FTD
         CmdEntry("neighbor"),
 #endif

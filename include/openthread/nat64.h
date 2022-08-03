@@ -88,6 +88,36 @@ typedef struct otIp4Cidr
 } otIp4Cidr;
 
 /**
+ * NAT64 function status
+ *
+ */
+typedef enum otNat64State
+{
+    OT_NAT64_DISABLED = 0, ///< The NAT64 functions are disabled
+    OT_NAT64_IDLE     = 1, ///< The NAT64 functions are enabled, but we choose not to advertise as NAT64 capable.
+    OT_NAT64_ACTIVE   = 2, ///< We are an active NAT64 capable border router on the network.
+} otNat64State;
+
+/**
+ * This method enables/disables the NAT64 functions in the Border Routing Manager.
+ *
+ * @param[in]  aInstance      A pointer to an OpenThread instance.
+ * @param[in]  aEnabled   A boolean to enable/disable the Border Routing Manager.
+ *
+ */
+void otNat64SetEnabled(otInstance *aInstance, bool aEnabled);
+
+/**
+ * Returns the state of NAT64 functions
+ *
+ * @param[in]  aInstance      A pointer to an OpenThread instance.
+ *
+ * @returns The current state of NAT64 functions.
+ *
+ */
+otNat64State otNat64GetState(otInstance *aInstance);
+
+/**
  * @}
  *
  */

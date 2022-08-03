@@ -70,6 +70,7 @@ RoutingManager::RoutingManager(Instance &aInstance)
     , mOnLinkPrefixDeprecateTimer(aInstance, HandleOnLinkPrefixDeprecateTimer)
     , mDiscoveredPrefixTable(aInstance)
 #if OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
+    , mNat64Enabled(true)
     , mInfraIfNat64PrefixStaleTimer(aInstance, HandleInfraIfNat64PrefixStaleTimer)
 #endif
     , mTimeRouterAdvMessageLastUpdate(TimerMilli::GetNow())
@@ -187,6 +188,27 @@ exit:
 }
 
 #if OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
+void RoutingManager::SetNat64Enabled(bool aEnabled)
+{
+    if (mNat64Enabled != aEnabled)
+    {
+        mNat64Enabled = aEnabled;
+        EvaluateState();
+    }
+}
+
+RoutingManager::Nat64State RoutingManager::GetNat64State(void)
+{
+    Nat64State ret;
+
+    VerifyOrExit(mNat64Enabled, ret = Nat64State::kDisabled);
+    VerifyOrExit(mAdvertisedNat64Prefix.IsValidNat64(), ret = Nat64State::kIdle);
+    ret = Nat64State::kActive;
+
+exit:
+    return ret;
+}
+
 Error RoutingManager::GetNat64Prefix(Ip6::Prefix &aPrefix, RoutePreference *aRoutePreference)
 {
     Error error = kErrorNone;
@@ -723,9 +745,10 @@ void RoutingManager::EvaluateNat64Prefix(void)
     // - the preferred NAT64 prefix in Network Data was advertised by this BR
     // - the preferred NAT64 prefix in Network Data is same as the infrastructure prefix
     // TODO: change to check RLOC16 to determine if the NAT64 prefix was advertised by this BR
-    shouldAdvertise = (error == kErrorNotFound || preferredNat64PrefixConfig.mPreference < routePreference ||
-                       preferredNat64PrefixConfig.GetPrefix() == mAdvertisedNat64Prefix ||
-                       preferredNat64PrefixConfig.GetPrefix() == mInfraIfNat64Prefix);
+    shouldAdvertise =
+        mNat64Enabled && (error == kErrorNotFound || preferredNat64PrefixConfig.mPreference < routePreference ||
+                          preferredNat64PrefixConfig.GetPrefix() == mAdvertisedNat64Prefix ||
+                          preferredNat64PrefixConfig.GetPrefix() == mInfraIfNat64Prefix);
 
     if (mAdvertisedNat64Prefix.IsValidNat64() && (!shouldAdvertise || nat64Prefix != mAdvertisedNat64Prefix))
     {

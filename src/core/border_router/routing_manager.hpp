@@ -47,6 +47,7 @@
 #error "OPENTHREAD_CONFIG_IP6_SLAAC_ENABLE is required for OPENTHREAD_CONFIG_BORDER_ROUTING_ENABLE."
 #endif
 
+#include <openthread/nat64.h>
 #include <openthread/netdata.h>
 
 #include "border_router/infra_if.hpp"
@@ -82,6 +83,15 @@ public:
     typedef NetworkData::RoutePreference       RoutePreference;     ///< Route preference (high, medium, low).
     typedef otBorderRoutingPrefixTableIterator PrefixTableIterator; ///< Prefix Table Iterator.
     typedef otBorderRoutingPrefixTableEntry    PrefixTableEntry;    ///< Prefix Table Entry.
+
+#if OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
+    enum Nat64State : uint8_t
+    {
+        kDisabled = OT_NAT64_DISABLED,
+        kIdle     = OT_NAT64_IDLE,
+        kActive   = OT_NAT64_ACTIVE,
+    };
+#endif // OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
 
     /**
      * This constructor initializes the routing manager.
@@ -187,6 +197,22 @@ public:
     Error GetOnLinkPrefix(Ip6::Prefix &aPrefix);
 
 #if OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
+    /**
+     * This method enables/disables the NAT64 functions in the Border Routing Manager.
+     *
+     * @param[in]  aEnabled   A boolean to enable/disable the Border Routing Manager.
+     *
+     */
+    void SetNat64Enabled(bool aEnabled);
+
+    /**
+     * Returns the state of NAT64 functions
+     *
+     * @returns The current state of NAT64 functions.
+     *
+     */
+    Nat64State GetNat64State(void);
+
     /**
      * This method returns the infrastructure or local NAT64 prefix and its route preference.
      *
@@ -643,6 +669,7 @@ private:
     DiscoveredPrefixTable mDiscoveredPrefixTable;
 
 #if OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
+    bool mNat64Enabled;
     // The latest NAT64 prefix discovered on the infrastructure interface.
     Ip6::Prefix mInfraIfNat64Prefix;
     // The NAT64 prefix allocated from the /48 BR ULA prefix.

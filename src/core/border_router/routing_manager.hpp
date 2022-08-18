@@ -84,6 +84,17 @@ public:
     typedef otBorderRoutingPrefixTableIterator PrefixTableIterator; ///< Prefix Table Iterator.
     typedef otBorderRoutingPrefixTableEntry    PrefixTableEntry;    ///< Prefix Table Entry.
 
+#if OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
+    enum Nat64State
+    {
+        kNat64Disabled = OT_BORDER_ROUTING_NAT64_DISABLED, ///< The NAT64 advertisement is disabled.
+        kNat64Idle = OT_BORDER_ROUTING_NAT64_IDLE, ///< The NAT64 advertisement is enabled, but there is another NAT64
+                                                   ///< enabled border router with a higher priority.
+        kNat64Active =
+            OT_BORDER_ROUTING_NAT64_ACTIVE, ///< This border router is an active NAT64 border router in the network.
+    };
+#endif
+
     /**
      * This constructor initializes the routing manager.
      *
@@ -220,6 +231,38 @@ public:
      *
      */
     void UpdateInfraIfNat64Prefix(const Ip6::Prefix &aPrefix);
+
+    /**
+     * Returns the status of NAT64 status of border routing module.
+     *
+     * @note If OPENTHREAD_CONFIG_NAT64_TRANSLATOR_ENABLED and OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLED are both
+     * set, border routing manager will manage the configured NAT64 prefix. This value can be used as global NAT64
+     * status.
+     *
+     * @note When border routing NAT64 is enabled but border routing manager is disabled, `OT_BORDER_ROUTING_NAT64_IDLE`
+     * will be returned.
+     *
+     * @retval kNat64Disabled  The NAT64 advertisement is disabled.
+     * @retval kNat64Idle      The NAT64 advertisement is enabled, but there is another NAT64 enabled border router with
+     * a higher priority or the routing manager is not current running.
+     * @retval kNat64Active    This border router is an active NAT64 border router in the network.
+     *
+     */
+    Nat64State GetNat64State();
+
+    /**
+     * Returns the status of NAT64 status of border routing module.
+     *
+     * @note If OPENTHREAD_CONFIG_NAT64_TRANSLATOR_ENABLED and OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLED are both
+     * set, border routing manager will manage the configured NAT64 prefix. Disabling NAT64 related functions in border
+     * routing will also disable the NAT64 translator.
+     *
+     * @note Setting the state of NAT64 manager when border routing manager is disabled is allowed.
+     *
+     * @param[in] aEnabled  Enable or disable the NAT64 functions for this border router.
+     *
+     */
+    void SetNat64Enabled(bool aEnabled);
 #endif // OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
 
     /**
@@ -710,6 +753,8 @@ private:
     DiscoveredPrefixTable mDiscoveredPrefixTable;
 
 #if OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
+    bool mNat64Enabled;
+
     // The latest NAT64 prefix discovered on the infrastructure interface.
     Ip6::Prefix mInfraIfNat64Prefix;
     // The NAT64 prefix allocated from the /48 BR ULA prefix.

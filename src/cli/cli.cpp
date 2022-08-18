@@ -622,6 +622,40 @@ template <> otError Interpreter::Process<Cmd("br")>(Arg aArgs[])
         OutputIp6Prefix(prefix);
         OutputLine(" prf:%s", PreferenceToString(preference));
     }
+    /**
+     * @cli br nat64state
+     * @code
+     * br nat64state
+     * Active
+     * Done
+     * @endcode
+     * @par api_copy
+     * #otBorderRoutingGetNat64State
+     */
+    else if (aArgs[0] == "nat64state")
+    {
+        bool enableNat64;
+        if (ParseEnableOrDisable(aArgs[1], enableNat64) == OT_ERROR_NONE)
+        {
+            otBorderRoutingSetNat64Enabled(GetInstancePtr(), enableNat64);
+            ExitNow();
+        }
+
+        switch (otBorderRoutingGetNat64State(GetInstancePtr()))
+        {
+        case OT_BORDER_ROUTING_NAT64_DISABLED:
+            OutputLine("Disabled");
+            break;
+        case OT_BORDER_ROUTING_NAT64_IDLE:
+            OutputLine("Idle");
+            break;
+        case OT_BORDER_ROUTING_NAT64_ACTIVE:
+            OutputLine("Active");
+            break;
+        default:
+            OutputLine("Unknown");
+        }
+    }
 #endif // OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
     /**
      * @cli br rioprf (high,med,low)

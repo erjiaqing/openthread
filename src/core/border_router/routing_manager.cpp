@@ -70,6 +70,7 @@ RoutingManager::RoutingManager(Instance &aInstance)
     , mLocalOnLinkPrefix(aInstance)
     , mDiscoveredPrefixTable(aInstance)
 #if OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLE
+    , mNat64Enabled(true)
     , mInfraIfNat64PrefixStaleTimer(aInstance, HandleInfraIfNat64PrefixStaleTimer)
 #endif
     , mDiscoveredPrefixStaleTimer(aInstance, HandleDiscoveredPrefixStaleTimer)
@@ -197,6 +198,27 @@ Error RoutingManager::GetFavoredNat64Prefix(Ip6::Prefix &aPrefix, RoutePreferenc
 exit:
     return error;
 }
+
+RoutingManager::Nat64State RoutingManager::GetNat64State()
+{
+    Nat64State ret = kNat64Active;
+
+    VerifyOrExit(mNat64Enabled, ret = kNat64Disabled);
+    VerifyOrExit(mAdvertisedNat64Prefix.IsValidNat64(), ret = kNat64Idle);
+
+exit:
+    return ret;
+}
+
+void RoutingManager::SetNat64Enabled(bool aEnabled)
+{
+    mNat64Enabled = aEnabled;
+    if (mIsRunning)
+    {
+        EvaluateNat64Prefix();
+    }
+}
+
 #endif
 
 Error RoutingManager::LoadOrGenerateRandomBrUlaPrefix(void)
@@ -586,9 +608,10 @@ void RoutingManager::EvaluateNat64Prefix(void)
     // - the preferred NAT64 prefix in Network Data was advertised by this BR
     // - the preferred NAT64 prefix in Network Data is same as the infrastructure prefix
     // TODO: change to check RLOC16 to determine if the NAT64 prefix was advertised by this BR
-    shouldAdvertise = (error == kErrorNotFound || preferredNat64PrefixConfig.mPreference < routePreference ||
-                       preferredNat64PrefixConfig.GetPrefix() == mAdvertisedNat64Prefix ||
-                       preferredNat64PrefixConfig.GetPrefix() == mInfraIfNat64Prefix);
+    shouldAdvertise =
+        mNat64Enabled && (error == kErrorNotFound || preferredNat64PrefixConfig.mPreference < routePreference ||
+                          preferredNat64PrefixConfig.GetPrefix() == mAdvertisedNat64Prefix ||
+                          preferredNat64PrefixConfig.GetPrefix() == mInfraIfNat64Prefix);
 
     if (mAdvertisedNat64Prefix.IsValidNat64() && (!shouldAdvertise || nat64Prefix != mAdvertisedNat64Prefix))
     {

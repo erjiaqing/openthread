@@ -276,6 +276,52 @@ otError otBorderRoutingGetNextPrefixTableEntry(otInstance *                     
                                                otBorderRoutingPrefixTableEntry *   aEntry);
 
 /**
+ * Routing manager NAT64 advertisement status.
+ *
+ */
+typedef enum otBorderRoutingNat64State
+{
+    OT_BORDER_ROUTING_NAT64_DISABLED, ///< The NAT64 advertisement is disabled.
+    OT_BORDER_ROUTING_NAT64_IDLE,     ///< The NAT64 advertisement is enabled, but there is another NAT64 enabled border
+                                      ///< router with a higher priority or the routing manager is not current running.
+    OT_BORDER_ROUTING_NAT64_ACTIVE,   ///< This border router is an active NAT64 border router in the network.
+} otBorderRoutingNat64Status;
+
+/**
+ * Returns the status of NAT64 status of border routing module.
+ *
+ * @note If OPENTHREAD_CONFIG_NAT64_TRANSLATOR_ENABLED and OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLED are both set,
+ * border routing manager will manage the configured NAT64 prefix. This value can be used as global NAT64 status.
+ *
+ * @note When border routing NAT64 is enabled but border routing manager is disabled, `OT_BORDER_ROUTING_NAT64_IDLE`
+ * will be returned.
+ *
+ * @param[in] aInstance The OpenThread instance.
+ *
+ * @retval OT_BORDER_ROUTING_NAT64_DISABLED  The NAT64 advertisement is disabled.
+ * @retval OT_BORDER_ROUTING_NAT64_IDLE      The NAT64 advertisement is enabled, but there is another NAT64 enabled
+ * border router with a higher priority or the routing manager is not current running.
+ * @retval OT_BORDER_ROUTING_NAT64_ACTIVE    This border router is an active NAT64 border router in the network.
+ *
+ */
+otBorderRoutingNat64State otBorderRoutingGetNat64State(otInstance *aInstance);
+
+/**
+ * Returns the status of NAT64 status of border routing module.
+ *
+ * @note If OPENTHREAD_CONFIG_NAT64_TRANSLATOR_ENABLED and OPENTHREAD_CONFIG_BORDER_ROUTING_NAT64_ENABLED are both set,
+ * border routing manager will manage the configured NAT64 prefix. Disabling NAT64 related functions in border routing
+ * will also disable the NAT64 translator.
+ *
+ * @note Setting the state of NAT64 manager when border routing manager is disabled is allowed.
+ *
+ * @param[in] aInstance The OpenThread instance.
+ * @param[in] aEnabled  Enable or disable the NAT64 functions for this border router.
+ *
+ */
+void otBorderRoutingSetNat64Enabled(otInstance *aInstance, bool aEnabled);
+
+/**
  * @}
  *
  */

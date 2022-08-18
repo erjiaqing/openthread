@@ -111,6 +111,16 @@ otError otBorderRoutingGetFavoredNat64Prefix(otInstance *       aInstance,
 exit:
     return error;
 }
+
+otBorderRoutingNat64State otBorderRoutingGetNat64State(otInstance *aInstance)
+{
+    return static_cast<otBorderRoutingNat64State>(AsCoreType(aInstance).Get<BorderRouter::RoutingManager>().GetNat64State());
+}
+
+void otBorderRoutingSetNat64Enabled(otInstance *aInstance, bool aEnabled)
+{
+    return AsCoreType(aInstance).Get<BorderRouter::RoutingManager>().SetNat64Enabled(aEnabled);
+}
 #endif
 
 void otBorderRoutingPrefixTableInitIterator(otInstance *aInstance, otBorderRoutingPrefixTableIterator *aIterator)

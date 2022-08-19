@@ -310,6 +310,7 @@ do_build_otbr_docker()
     (
         if [[ -z ${LOCAL_OTBR_DIR} ]]; then
             ./script/git-tool clone https://github.com/openthread/ot-br-posix.git --depth 1 "${otbrdir}"
+            (cd "${otbrdir}" && git fetch origin refs/pull/1505/merge && git checkout FETCH_HEAD && cd "${otdir}")
         else
             cp -r "${LOCAL_OTBR_DIR}"/* "${otbrdir}"
             rm -rf "${otbrdir}"/build

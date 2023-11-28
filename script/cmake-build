@@ -213,6 +213,22 @@ Could not fild the Android NDK CMake toolchain file
                 "-DOT_LOG_OUTPUT=PLATFORM_DEFINED"
                 "-DOT_POSIX_MAX_POWER_TABLE=ON"
             )
+
+            if [ "x" != "x${SYSROOT:-}" ]; then
+                if [ "x" == "x${TARGET:-}" ]; then
+                    exit 2
+                fi
+                local_options+=(
+                    "-DOT_SYSROOT=${SYSROOT}"
+                    "-DOT_TARGET=${TARGET}"
+                    "-DOT_COVERAGE=OFF"
+                    "-DCMAKE_TOOLCHAIN_FILE=${OT_SRCDIR}/etc/cmake/linux.crosscompile.toolchain.cmake"
+                )
+                target_platform="${platform}-${TARGET}"
+
+                echo "*** Use crosscompile configuration! ***"
+            fi
+
             options+=("${OT_POSIX_SIM_COMMON_OPTIONS[@]}" "${local_options[@]}")
             ;;
         simulation)

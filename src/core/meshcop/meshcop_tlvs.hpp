@@ -29,7 +29,6 @@
 /**
  * @file
  *   This file includes definitions for generating and processing MeshCoP TLVs.
- *
  */
 
 #ifndef MESHCOP_TLVS_HPP_
@@ -54,6 +53,7 @@
 #include "net/ip6_address.hpp"
 #include "radio/radio.hpp"
 #include "thread/key_manager.hpp"
+#include "thread/mle_tlvs.hpp"
 #include "thread/mle_types.hpp"
 
 namespace ot {
@@ -61,7 +61,6 @@ namespace MeshCoP {
 
 /**
  * Implements MeshCoP TLV generation and parsing.
- *
  */
 OT_TOOL_PACKED_BEGIN
 class Tlv : public ot::Tlv
@@ -69,7 +68,6 @@ class Tlv : public ot::Tlv
 public:
     /**
      * MeshCoP TLV Types.
-     *
      */
     enum Type : uint8_t
     {
@@ -110,6 +108,7 @@ public:
         kPeriod                  = OT_MESHCOP_TLV_PERIOD,                   ///< Period TLV
         kScanDuration            = OT_MESHCOP_TLV_SCAN_DURATION,            ///< Scan Duration TLV
         kEnergyList              = OT_MESHCOP_TLV_ENERGY_LIST,              ///< Energy List TLV
+        kThreadDomainName        = OT_MESHCOP_TLV_THREAD_DOMAIN_NAME,       ///< Thread Domain Name TLV
         kDiscoveryRequest        = OT_MESHCOP_TLV_DISCOVERYREQUEST,         ///< Discovery Request TLV
         kDiscoveryResponse       = OT_MESHCOP_TLV_DISCOVERYRESPONSE,        ///< Discovery Response TLV
         kJoinerAdvertisement     = OT_MESHCOP_TLV_JOINERADVERTISEMENT,      ///< Joiner Advertisement TLV
@@ -117,21 +116,20 @@ public:
 
     /**
      * Max length of Provisioning URL TLV.
-     *
      */
     static constexpr uint8_t kMaxProvisioningUrlLength = OT_PROVISIONING_URL_MAX_SIZE;
 
-    static constexpr uint8_t kMaxCommissionerIdLength  = 64; ///< Max length of Commissioner ID TLV.
-    static constexpr uint8_t kMaxVendorNameLength      = 32; ///< Max length of Vendor Name TLV.
-    static constexpr uint8_t kMaxVendorModelLength     = 32; ///< Max length of Vendor Model TLV.
-    static constexpr uint8_t kMaxVendorSwVersionLength = 16; ///< Max length of Vendor SW Version TLV.
-    static constexpr uint8_t kMaxVendorDataLength      = 64; ///< Max length of Vendor Data TLV.
+    static constexpr uint8_t kMaxCommissionerIdLength   = 64; ///< Max length of Commissioner ID TLV.
+    static constexpr uint8_t kMaxVendorNameLength       = 32; ///< Max length of Vendor Name TLV.
+    static constexpr uint8_t kMaxVendorModelLength      = 32; ///< Max length of Vendor Model TLV.
+    static constexpr uint8_t kMaxVendorSwVersionLength  = 16; ///< Max length of Vendor SW Version TLV.
+    static constexpr uint8_t kMaxVendorDataLength       = 64; ///< Max length of Vendor Data TLV.
+    static constexpr uint8_t kMaxThreadDomainNameLength = 16; ///< Max length of Thread Domain Name TLV.
 
     /**
      * Returns the Type value.
      *
      * @returns The Type value.
-     *
      */
     Type GetType(void) const { return static_cast<Type>(ot::Tlv::GetType()); }
 
@@ -139,7 +137,6 @@ public:
      * Sets the Type value.
      *
      * @param[in]  aType  The Type value.
-     *
      */
     void SetType(Type aType) { ot::Tlv::SetType(static_cast<uint8_t>(aType)); }
 
@@ -147,7 +144,6 @@ public:
      * Returns a pointer to the next TLV.
      *
      * @returns A pointer to the next TLV.
-     *
      */
     Tlv *GetNext(void) { return As<Tlv>(ot::Tlv::GetNext()); }
 
@@ -155,25 +151,13 @@ public:
      * Returns a pointer to the next TLV.
      *
      * @returns A pointer to the next TLV.
-     *
      */
     const Tlv *GetNext(void) const { return As<Tlv>(ot::Tlv::GetNext()); }
-
-    /**
-     * Indicates whether a TLV appears to be well-formed.
-     *
-     * @param[in]  aTlv  A reference to the TLV.
-     *
-     * @returns TRUE if the TLV appears to be well-formed, FALSE otherwise.
-     *
-     */
-    static bool IsValid(const Tlv &aTlv);
 
 } OT_TOOL_PACKED_END;
 
 /**
  * Implements extended MeshCoP TLV generation and parsing.
- *
  */
 OT_TOOL_PACKED_BEGIN
 class ExtendedTlv : public ot::ExtendedTlv
@@ -183,7 +167,6 @@ public:
      * Returns the Type value.
      *
      * @returns The Type value.
-     *
      */
     MeshCoP::Tlv::Type GetType(void) const { return static_cast<MeshCoP::Tlv::Type>(ot::ExtendedTlv::GetType()); }
 
@@ -191,235 +174,84 @@ public:
      * Sets the Type value.
      *
      * @param[in]  aType  The Type value.
-     *
      */
     void SetType(MeshCoP::Tlv::Type aType) { ot::ExtendedTlv::SetType(static_cast<uint8_t>(aType)); }
 } OT_TOOL_PACKED_END;
 
 /**
  * Defines Commissioner UDP Port TLV constants and types.
- *
  */
 typedef UintTlvInfo<Tlv::kCommissionerUdpPort, uint16_t> CommissionerUdpPortTlv;
 
 /**
  * Defines IPv6 Address TLV constants and types.
- *
  */
 typedef SimpleTlvInfo<Tlv::kIp6Address, Ip6::Address> Ip6AddressTlv;
 
 /**
  * Defines Joiner IID TLV constants and types.
- *
  */
 typedef SimpleTlvInfo<Tlv::kJoinerIid, Ip6::InterfaceIdentifier> JoinerIidTlv;
 
 /**
  * Defines Joiner Router Locator TLV constants and types.
- *
  */
 typedef UintTlvInfo<Tlv::kJoinerRouterLocator, uint16_t> JoinerRouterLocatorTlv;
 
 /**
  * Defines Joiner Router KEK TLV constants and types.
- *
  */
 typedef SimpleTlvInfo<Tlv::kJoinerRouterKek, Kek> JoinerRouterKekTlv;
 
 /**
  * Defines Count TLV constants and types.
- *
  */
 typedef UintTlvInfo<Tlv::kCount, uint8_t> CountTlv;
 
 /**
  * Defines Period TLV constants and types.
- *
  */
 typedef UintTlvInfo<Tlv::kPeriod, uint16_t> PeriodTlv;
 
 /**
  * Defines Scan Duration TLV constants and types.
- *
  */
 typedef UintTlvInfo<Tlv::kScanDuration, uint16_t> ScanDurationTlv;
 
 /**
- * Defines Commissioner ID TLV constants and type.s
- *
+ * Defines Commissioner ID TLV constants and types.
  */
 typedef StringTlvInfo<Tlv::kCommissionerId, Tlv::kMaxCommissionerIdLength> CommissionerIdTlv;
 
 /**
- * Implements Channel TLV generation and parsing.
- *
+ * Implements Channel TLV value format.
  */
-OT_TOOL_PACKED_BEGIN
-class ChannelTlv : public Tlv, public TlvInfo<Tlv::kChannel>
-{
-public:
-    /**
-     * Initializes the TLV.
-     *
-     */
-    void Init(void)
-    {
-        SetType(kChannel);
-        SetLength(sizeof(*this) - sizeof(Tlv));
-    }
-
-    /**
-     * Indicates whether or not the TLV appears to be well-formed.
-     *
-     * @retval TRUE   If the TLV appears to be well-formed.
-     * @retval FALSE  If the TLV does not appear to be well-formed.
-     *
-     */
-    bool IsValid(void) const;
-
-    /**
-     * Returns the ChannelPage value.
-     *
-     * @returns The ChannelPage value.
-     *
-     */
-    uint8_t GetChannelPage(void) const { return mChannelPage; }
-
-    /**
-     * Sets the ChannelPage value.
-     *
-     * @param[in]  aChannelPage  The ChannelPage value.
-     *
-     */
-    void SetChannelPage(uint8_t aChannelPage) { mChannelPage = aChannelPage; }
-
-    /**
-     * Returns the Channel value.
-     *
-     * @returns The Channel value.
-     *
-     */
-    uint16_t GetChannel(void) const { return BigEndian::HostSwap16(mChannel); }
-
-    /**
-     * Sets the Channel value.
-     * Note: This method also sets the channel page according to the channel value.
-     *
-     * @param[in]  aChannel  The Channel value.
-     *
-     */
-    void SetChannel(uint16_t aChannel);
-
-private:
-    uint8_t  mChannelPage;
-    uint16_t mChannel;
-} OT_TOOL_PACKED_END;
+typedef Mle::ChannelTlvValue ChannelTlvValue;
 
 /**
- * Implements PAN ID TLV generation and parsing.
- *
+ * Defines Channel TLV constants and types.
  */
-OT_TOOL_PACKED_BEGIN
-class PanIdTlv : public Tlv, public UintTlvInfo<Tlv::kPanId, uint16_t>
-{
-public:
-    /**
-     * Initializes the TLV.
-     *
-     */
-    void Init(void)
-    {
-        SetType(kPanId);
-        SetLength(sizeof(*this) - sizeof(Tlv));
-    }
-
-    /**
-     * Indicates whether or not the TLV appears to be well-formed.
-     *
-     * @retval TRUE   If the TLV appears to be well-formed.
-     * @retval FALSE  If the TLV does not appear to be well-formed.
-     *
-     */
-    bool IsValid(void) const { return GetLength() >= sizeof(*this) - sizeof(Tlv); }
-
-    /**
-     * Returns the PAN ID value.
-     *
-     * @returns The PAN ID value.
-     *
-     */
-    uint16_t GetPanId(void) const { return BigEndian::HostSwap16(mPanId); }
-
-    /**
-     * Sets the PAN ID value.
-     *
-     * @param[in]  aPanId  The PAN ID value.
-     *
-     */
-    void SetPanId(uint16_t aPanId) { mPanId = BigEndian::HostSwap16(aPanId); }
-
-private:
-    uint16_t mPanId;
-} OT_TOOL_PACKED_END;
+typedef SimpleTlvInfo<Tlv::kChannel, ChannelTlvValue> ChannelTlv;
 
 /**
- * Implements Extended PAN ID TLV generation and parsing.
- *
+ * Defines PAN ID TLV constants and types.
  */
-OT_TOOL_PACKED_BEGIN
-class ExtendedPanIdTlv : public Tlv, public SimpleTlvInfo<Tlv::kExtendedPanId, ExtendedPanId>
-{
-public:
-    /**
-     * Initializes the TLV.
-     *
-     */
-    void Init(void)
-    {
-        SetType(kExtendedPanId);
-        SetLength(sizeof(*this) - sizeof(Tlv));
-    }
+typedef UintTlvInfo<Tlv::kPanId, uint16_t> PanIdTlv;
 
-    /**
-     * Indicates whether or not the TLV appears to be well-formed.
-     *
-     * @retval TRUE   If the TLV appears to be well-formed.
-     * @retval FALSE  If the TLV does not appear to be well-formed.
-     *
-     */
-    bool IsValid(void) const { return GetLength() >= sizeof(*this) - sizeof(Tlv); }
-
-    /**
-     * Returns the Extended PAN ID value.
-     *
-     * @returns The Extended PAN ID value.
-     *
-     */
-    const ExtendedPanId &GetExtendedPanId(void) const { return mExtendedPanId; }
-
-    /**
-     * Sets the Extended PAN ID value.
-     *
-     * @param[in]  aExtendedPanId  An Extended PAN ID value.
-     *
-     */
-    void SetExtendedPanId(const ExtendedPanId &aExtendedPanId) { mExtendedPanId = aExtendedPanId; }
-
-private:
-    ExtendedPanId mExtendedPanId;
-} OT_TOOL_PACKED_END;
+/**
+ * Defines Extended PAN ID TLV constants and types.
+ */
+typedef SimpleTlvInfo<Tlv::kExtendedPanId, ExtendedPanId> ExtendedPanIdTlv;
 
 /**
  * Implements Network Name TLV generation and parsing.
- *
  */
 OT_TOOL_PACKED_BEGIN
-class NetworkNameTlv : public Tlv, public TlvInfo<Tlv::kNetworkName>
+class NetworkNameTlv : public Tlv, public StringTlvInfo<Tlv::kNetworkName, NetworkName::kMaxSize>
 {
 public:
     /**
      * Initializes the TLV.
-     *
      */
     void Init(void)
     {
@@ -432,7 +264,6 @@ public:
      *
      * @retval TRUE   If the TLV appears to be well-formed.
      * @retval FALSE  If the TLV does not appear to be well-formed.
-     *
      */
     bool IsValid(void) const;
 
@@ -440,7 +271,6 @@ public:
      * Gets the Network Name value.
      *
      * @returns The Network Name value (as `NameData`).
-     *
      */
     NameData GetNetworkName(void) const;
 
@@ -448,7 +278,6 @@ public:
      * Sets the Network Name value.
      *
      * @param[in] aNameData   A Network Name value (as `NameData`).
-     *
      */
     void SetNetworkName(const NameData &aNameData);
 
@@ -457,209 +286,29 @@ private:
 } OT_TOOL_PACKED_END;
 
 /**
- * Implements PSKc TLV generation and parsing.
- *
+ * Defines PSKc TLV constants and types.
  */
-OT_TOOL_PACKED_BEGIN
-class PskcTlv : public Tlv, public SimpleTlvInfo<Tlv::kPskc, Pskc>
-{
-public:
-    /**
-     * Initializes the TLV.
-     *
-     */
-    void Init(void)
-    {
-        SetType(kPskc);
-        SetLength(sizeof(*this) - sizeof(Tlv));
-    }
-
-    /**
-     * Indicates whether or not the TLV appears to be well-formed.
-     *
-     * @retval TRUE   If the TLV appears to be well-formed.
-     * @retval FALSE  If the TLV does not appear to be well-formed.
-     *
-     */
-    bool IsValid(void) const { return GetLength() >= sizeof(*this) - sizeof(Tlv); }
-
-    /**
-     * Returns the PSKc value.
-     *
-     * @returns The PSKc value.
-     *
-     */
-    const Pskc &GetPskc(void) const { return mPskc; }
-
-    /**
-     * Sets the PSKc value.
-     *
-     * @param[in]  aPskc  A pointer to the PSKc value.
-     *
-     */
-    void SetPskc(const Pskc &aPskc) { mPskc = aPskc; }
-
-private:
-    Pskc mPskc;
-} OT_TOOL_PACKED_END;
+typedef SimpleTlvInfo<Tlv::kPskc, Pskc> PskcTlv;
 
 /**
- * Implements Network Network Key TLV generation and parsing.
- *
+ * Defines Network Key TLV constants and types.
  */
-OT_TOOL_PACKED_BEGIN
-class NetworkKeyTlv : public Tlv, public SimpleTlvInfo<Tlv::kNetworkKey, NetworkKey>
-{
-public:
-    /**
-     * Initializes the TLV.
-     *
-     */
-    void Init(void)
-    {
-        SetType(kNetworkKey);
-        SetLength(sizeof(*this) - sizeof(Tlv));
-    }
-
-    /**
-     * Indicates whether or not the TLV appears to be well-formed.
-     *
-     * @retval TRUE   If the TLV appears to be well-formed.
-     * @retval FALSE  If the TLV does not appear to be well-formed.
-     *
-     */
-    bool IsValid(void) const { return GetLength() >= sizeof(*this) - sizeof(Tlv); }
-
-    /**
-     * Returns the Network Network Key value.
-     *
-     * @returns The Network Network Key value.
-     *
-     */
-    const NetworkKey &GetNetworkKey(void) const { return mNetworkKey; }
-
-    /**
-     * Sets the Network Network Key value.
-     *
-     * @param[in]  aNetworkKey  The Network Network Key.
-     *
-     */
-    void SetNetworkKey(const NetworkKey &aNetworkKey) { mNetworkKey = aNetworkKey; }
-
-private:
-    NetworkKey mNetworkKey;
-} OT_TOOL_PACKED_END;
+typedef SimpleTlvInfo<Tlv::kNetworkKey, NetworkKey> NetworkKeyTlv;
 
 /**
- * Implements Network Key Sequence TLV generation and parsing.
- *
+ * Defines Network Key Sequence TLV constants and types.
  */
-OT_TOOL_PACKED_BEGIN
-class NetworkKeySequenceTlv : public Tlv, public UintTlvInfo<Tlv::kNetworkKeySequence, uint32_t>
-{
-public:
-    /**
-     * Initializes the TLV.
-     *
-     */
-    void Init(void)
-    {
-        SetType(kNetworkKeySequence);
-        SetLength(sizeof(*this) - sizeof(Tlv));
-    }
-
-    /**
-     * Indicates whether or not the TLV appears to be well-formed.
-     *
-     * @retval TRUE   If the TLV appears to be well-formed.
-     * @retval FALSE  If the TLV does not appear to be well-formed.
-     *
-     */
-    bool IsValid(void) const { return GetLength() >= sizeof(*this) - sizeof(Tlv); }
-
-    /**
-     * Returns the Network Key Sequence value.
-     *
-     * @returns The Network Key Sequence value.
-     *
-     */
-    uint32_t GetNetworkKeySequence(void) const { return BigEndian::HostSwap32(mNetworkKeySequence); }
-
-    /**
-     * Sets the Network Key Sequence value.
-     *
-     * @param[in]  aNetworkKeySequence  The Network Key Sequence value.
-     *
-     */
-    void SetNetworkKeySequence(uint32_t aNetworkKeySequence)
-    {
-        mNetworkKeySequence = BigEndian::HostSwap32(aNetworkKeySequence);
-    }
-
-private:
-    uint32_t mNetworkKeySequence;
-} OT_TOOL_PACKED_END;
+typedef UintTlvInfo<Tlv::kNetworkKeySequence, uint32_t> NetworkKeySequenceTlv;
 
 /**
- * Implements Mesh Local Prefix TLV generation and parsing.
- *
+ * Defines Mesh Local Prefix TLV constants and types.
  */
-OT_TOOL_PACKED_BEGIN
-class MeshLocalPrefixTlv : public Tlv, public SimpleTlvInfo<Tlv::kMeshLocalPrefix, Ip6::NetworkPrefix>
-{
-public:
-    /**
-     * Initializes the TLV.
-     *
-     */
-    void Init(void)
-    {
-        SetType(kMeshLocalPrefix);
-        SetLength(sizeof(*this) - sizeof(Tlv));
-    }
-
-    /**
-     * Indicates whether or not the TLV appears to be well-formed.
-     *
-     * @retval TRUE   If the TLV appears to be well-formed.
-     * @retval FALSE  If the TLV does not appear to be well-formed.
-     *
-     */
-    bool IsValid(void) const { return GetLength() >= sizeof(*this) - sizeof(Tlv); }
-
-    /**
-     * Returns the size (in bytes) of the Mesh Local Prefix field.
-     *
-     * @returns The size (in bytes) of the Mesh Local Prefix field (8 bytes).
-     *
-     */
-    uint8_t GetMeshLocalPrefixLength(void) const { return sizeof(mMeshLocalPrefix); }
-
-    /**
-     * Returns the Mesh Local Prefix value.
-     *
-     * @returns The Mesh Local Prefix value.
-     *
-     */
-    const Ip6::NetworkPrefix &GetMeshLocalPrefix(void) const { return mMeshLocalPrefix; }
-
-    /**
-     * Sets the Mesh Local Prefix value.
-     *
-     * @param[in]  aMeshLocalPrefix  A pointer to the Mesh Local Prefix value.
-     *
-     */
-    void SetMeshLocalPrefix(const Ip6::NetworkPrefix &aMeshLocalPrefix) { mMeshLocalPrefix = aMeshLocalPrefix; }
-
-private:
-    Ip6::NetworkPrefix mMeshLocalPrefix;
-} OT_TOOL_PACKED_END;
+typedef SimpleTlvInfo<Tlv::kMeshLocalPrefix, Ip6::NetworkPrefix> MeshLocalPrefixTlv;
 
 class SteeringData;
 
 /**
  * Implements Steering Data TLV generation and parsing.
- *
  */
 OT_TOOL_PACKED_BEGIN
 class SteeringDataTlv : public Tlv, public TlvInfo<Tlv::kSteeringData>
@@ -667,7 +316,6 @@ class SteeringDataTlv : public Tlv, public TlvInfo<Tlv::kSteeringData>
 public:
     /**
      * Initializes the TLV.
-     *
      */
     void Init(void)
     {
@@ -681,7 +329,6 @@ public:
      *
      * @retval TRUE   If the TLV appears to be well-formed.
      * @retval FALSE  If the TLV does not appear to be well-formed.
-     *
      */
     bool IsValid(void) const { return GetLength() > 0; }
 
@@ -689,7 +336,6 @@ public:
      * Returns the Steering Data length.
      *
      * @returns The Steering Data length.
-     *
      */
     uint8_t GetSteeringDataLength(void) const
     {
@@ -698,7 +344,6 @@ public:
 
     /**
      * Sets all bits in the Bloom Filter to zero.
-     *
      */
     void Clear(void) { memset(mSteeringData, 0, GetSteeringDataLength()); }
 
@@ -706,7 +351,6 @@ public:
      * Copies the Steering Data from the TLV into a given `SteeringData` variable.
      *
      * @param[out]  aSteeringData   A reference to a `SteeringData` to copy into.
-     *
      */
     void CopyTo(SteeringData &aSteeringData) const;
 
@@ -716,7 +360,6 @@ private:
 
 /**
  * Implements Border Agent Locator TLV generation and parsing.
- *
  */
 OT_TOOL_PACKED_BEGIN
 class BorderAgentLocatorTlv : public Tlv, public UintTlvInfo<Tlv::kBorderAgentLocator, uint16_t>
@@ -724,7 +367,6 @@ class BorderAgentLocatorTlv : public Tlv, public UintTlvInfo<Tlv::kBorderAgentLo
 public:
     /**
      * Initializes the TLV.
-     *
      */
     void Init(void)
     {
@@ -737,7 +379,6 @@ public:
      *
      * @retval TRUE   If the TLV appears to be well-formed.
      * @retval FALSE  If the TLV does not appear to be well-formed.
-     *
      */
     bool IsValid(void) const { return GetLength() >= sizeof(*this) - sizeof(Tlv); }
 
@@ -745,7 +386,6 @@ public:
      * Returns the Border Agent Locator value.
      *
      * @returns The Border Agent Locator value.
-     *
      */
     uint16_t GetBorderAgentLocator(void) const { return BigEndian::HostSwap16(mLocator); }
 
@@ -753,7 +393,6 @@ public:
      * Sets the Border Agent Locator value.
      *
      * @param[in]  aLocator  The Border Agent Locator value.
-     *
      */
     void SetBorderAgentLocator(uint16_t aLocator) { mLocator = BigEndian::HostSwap16(aLocator); }
 
@@ -763,7 +402,6 @@ private:
 
 /**
  * Implements Commissioner Session ID TLV generation and parsing.
- *
  */
 OT_TOOL_PACKED_BEGIN
 class CommissionerSessionIdTlv : public Tlv, public UintTlvInfo<Tlv::kCommissionerSessionId, uint16_t>
@@ -771,7 +409,6 @@ class CommissionerSessionIdTlv : public Tlv, public UintTlvInfo<Tlv::kCommission
 public:
     /**
      * Initializes the TLV.
-     *
      */
     void Init(void)
     {
@@ -784,7 +421,6 @@ public:
      *
      * @retval TRUE   If the TLV appears to be well-formed.
      * @retval FALSE  If the TLV does not appear to be well-formed.
-     *
      */
     bool IsValid(void) const { return GetLength() >= sizeof(*this) - sizeof(Tlv); }
 
@@ -792,7 +428,6 @@ public:
      * Returns the Commissioner Session ID value.
      *
      * @returns The Commissioner Session ID value.
-     *
      */
     uint16_t GetCommissionerSessionId(void) const { return BigEndian::HostSwap16(mSessionId); }
 
@@ -800,7 +435,6 @@ public:
      * Sets the Commissioner Session ID value.
      *
      * @param[in]  aSessionId  The Commissioner Session ID value.
-     *
      */
     void SetCommissionerSessionId(uint16_t aSessionId) { mSessionId = BigEndian::HostSwap16(aSessionId); }
 
@@ -810,7 +444,6 @@ private:
 
 /**
  * Implements Security Policy TLV generation and parsing.
- *
  */
 OT_TOOL_PACKED_BEGIN
 class SecurityPolicyTlv : public Tlv, public TlvInfo<Tlv::kSecurityPolicy>
@@ -818,7 +451,6 @@ class SecurityPolicyTlv : public Tlv, public TlvInfo<Tlv::kSecurityPolicy>
 public:
     /**
      * Initializes the TLV.
-     *
      */
     void Init(void)
     {
@@ -831,7 +463,6 @@ public:
      *
      * @retval TRUE   If the TLV appears to be well-formed.
      * @retval FALSE  If the TLV does not appear to be well-formed.
-     *
      */
     bool IsValid(void) const;
 
@@ -839,7 +470,6 @@ public:
      * Returns the Security Policy.
      *
      * @returns  The Security Policy.
-     *
      */
     SecurityPolicy GetSecurityPolicy(void) const;
 
@@ -847,7 +477,6 @@ public:
      * Sets the Security Policy.
      *
      * @param[in]  aSecurityPolicy  The Security Policy which will be set.
-     *
      */
     void SetSecurityPolicy(const SecurityPolicy &aSecurityPolicy);
 
@@ -868,64 +497,12 @@ private:
 } OT_TOOL_PACKED_END;
 
 /**
- * Implements Active Timestamp TLV generation and parsing.
- *
+ * Defines Active Timestamp TLV constants and types.
  */
-OT_TOOL_PACKED_BEGIN
-class ActiveTimestampTlv : public Tlv, public SimpleTlvInfo<Tlv::kActiveTimestamp, Timestamp>
-{
-public:
-    /**
-     * Initializes the TLV.
-     *
-     */
-    void Init(void)
-    {
-        SetType(kActiveTimestamp);
-        SetLength(sizeof(*this) - sizeof(Tlv));
-        mTimestamp.Clear();
-    }
-
-    /**
-     * Indicates whether or not the TLV appears to be well-formed.
-     *
-     * @retval TRUE   If the TLV appears to be well-formed.
-     * @retval FALSE  If the TLV does not appear to be well-formed.
-     *
-     */
-    bool IsValid(void) const { return GetLength() >= sizeof(*this) - sizeof(Tlv); }
-
-    /**
-     * Gets the timestamp.
-     *
-     * @returns The timestamp.
-     *
-     */
-    const Timestamp &GetTimestamp(void) const { return mTimestamp; }
-
-    /**
-     * Returns a reference to the timestamp.
-     *
-     * @returns A reference to the timestamp.
-     *
-     */
-    Timestamp &GetTimestamp(void) { return mTimestamp; }
-
-    /**
-     * Sets the timestamp.
-     *
-     * @param[in] aTimestamp   The new timestamp.
-     *
-     */
-    void SetTimestamp(const Timestamp &aTimestamp) { mTimestamp = aTimestamp; }
-
-private:
-    Timestamp mTimestamp;
-} OT_TOOL_PACKED_END;
+typedef SimpleTlvInfo<Tlv::kActiveTimestamp, Timestamp> ActiveTimestampTlv;
 
 /**
  * Implements State TLV generation and parsing.
- *
  */
 class StateTlv : public UintTlvInfo<Tlv::kState, uint8_t>
 {
@@ -934,7 +511,6 @@ public:
 
     /**
      * State values.
-     *
      */
     enum State : uint8_t
     {
@@ -949,431 +525,172 @@ public:
      * @param[in] aState  An item state.
      *
      * @returns A string representation of @p aState.
-     *
      */
     static const char *StateToString(State aState);
 };
 
 /**
- * Implements Joiner UDP Port TLV generation and parsing.
- *
+ * Defines Joiner UDP Port TLV constants and types.
  */
-OT_TOOL_PACKED_BEGIN
-class JoinerUdpPortTlv : public Tlv, public UintTlvInfo<Tlv::kJoinerUdpPort, uint16_t>
-{
-public:
-    /**
-     * Initializes the TLV.
-     *
-     */
-    void Init(void)
-    {
-        SetType(kJoinerUdpPort);
-        SetLength(sizeof(*this) - sizeof(Tlv));
-    }
-
-    /**
-     * Indicates whether or not the TLV appears to be well-formed.
-     *
-     * @retval TRUE   If the TLV appears to be well-formed.
-     * @retval FALSE  If the TLV does not appear to be well-formed.
-     *
-     */
-    bool IsValid(void) const { return GetLength() >= sizeof(*this) - sizeof(Tlv); }
-
-    /**
-     * Returns the UDP Port value.
-     *
-     * @returns The UDP Port value.
-     *
-     */
-    uint16_t GetUdpPort(void) const { return BigEndian::HostSwap16(mUdpPort); }
-
-    /**
-     * Sets the UDP Port value.
-     *
-     * @param[in]  aUdpPort  The UDP Port value.
-     *
-     */
-    void SetUdpPort(uint16_t aUdpPort) { mUdpPort = BigEndian::HostSwap16(aUdpPort); }
-
-private:
-    uint16_t mUdpPort;
-} OT_TOOL_PACKED_END;
+typedef UintTlvInfo<Tlv::kJoinerUdpPort, uint16_t> JoinerUdpPortTlv;
 
 /**
- * Implements Pending Timestamp TLV generation and parsing.
- *
+ * Defines Pending Timestamp TLV constants and types.
  */
-OT_TOOL_PACKED_BEGIN
-class PendingTimestampTlv : public Tlv, public SimpleTlvInfo<Tlv::kPendingTimestamp, Timestamp>
-{
-public:
-    /**
-     * Initializes the TLV.
-     *
-     */
-    void Init(void)
-    {
-        SetType(kPendingTimestamp);
-        SetLength(sizeof(*this) - sizeof(Tlv));
-        mTimestamp.Clear();
-    }
-
-    /**
-     * Indicates whether or not the TLV appears to be well-formed.
-     *
-     * @retval TRUE   If the TLV appears to be well-formed.
-     * @retval FALSE  If the TLV does not appear to be well-formed.
-     *
-     */
-    bool IsValid(void) const { return GetLength() >= sizeof(*this) - sizeof(Tlv); }
-
-    /**
-     * Gets the timestamp.
-     *
-     * @returns The timestamp.
-     *
-     */
-    const Timestamp &GetTimestamp(void) const { return mTimestamp; }
-
-    /**
-     * Returns a reference to the timestamp.
-     *
-     * @returns A reference to the timestamp.
-     *
-     */
-    Timestamp &GetTimestamp(void) { return mTimestamp; }
-
-    /**
-     * Sets the timestamp.
-     *
-     * @param[in] aTimestamp   The new timestamp.
-     *
-     */
-    void SetTimestamp(const Timestamp &aTimestamp) { mTimestamp = aTimestamp; }
-
-private:
-    Timestamp mTimestamp;
-} OT_TOOL_PACKED_END;
+typedef SimpleTlvInfo<Tlv::kPendingTimestamp, Timestamp> PendingTimestampTlv;
 
 /**
- * Implements Delay Timer TLV generation and parsing.
- *
+ * Defines Delay Timer TLV constants and types.
  */
-OT_TOOL_PACKED_BEGIN
-class DelayTimerTlv : public Tlv, public UintTlvInfo<Tlv::kDelayTimer, uint32_t>
+class DelayTimerTlv : public UintTlvInfo<Tlv::kDelayTimer, uint32_t>
 {
 public:
     /**
-     * Initializes the TLV.
-     *
+     * Minimum Delay Timer value (in msec).
      */
-    void Init(void)
-    {
-        SetType(kDelayTimer);
-        SetLength(sizeof(*this) - sizeof(Tlv));
-    }
+    static constexpr uint32_t kMinDelay = OPENTHREAD_CONFIG_TMF_PENDING_DATASET_MINIMUM_DELAY;
 
     /**
-     * Indicates whether or not the TLV appears to be well-formed.
-     *
-     * @retval TRUE   If the TLV appears to be well-formed.
-     * @retval FALSE  If the TLV does not appear to be well-formed.
-     *
+     * Maximum Delay Timer value (in msec).
      */
-    bool IsValid(void) const { return GetLength() >= sizeof(*this) - sizeof(Tlv); }
+    static constexpr uint32_t kMaxDelay = (72 * Time::kOneHourInMsec);
 
     /**
-     * Returns the Delay Timer value.
-     *
-     * @returns The Delay Timer value.
-     *
+     * Default Delay Timer value (in msec).
      */
-    uint32_t GetDelayTimer(void) const { return BigEndian::HostSwap32(mDelayTimer); }
+    static constexpr uint32_t kDefaultDelay = OPENTHREAD_CONFIG_TMF_PENDING_DATASET_DEFAULT_DELAY;
 
     /**
-     * Sets the Delay Timer value.
+     * Calculates the remaining delay in milliseconds, based on the value read from a Delay Timer TLV and the specified
+     * update time.
      *
-     * @param[in]  aDelayTimer  The Delay Timer value.
+     * Ensures that the calculated delay does not exceed `kMaxDelay`. Also accounts for time already elapsed since
+     * @p aUpdateTime.
      *
+     * Caller MUST ensure that @p aDelayTimerTlv is a Delay Timer TLV, otherwise behavior is undefined.
+     *
+     * @param[in] aDelayTimerTlv   The delay timer TLV to read delay from.
+     * @param[in] aUpdateTimer     The update time of the Dataset.
+     *
+     * @return The remaining delay (in msec).
      */
-    void SetDelayTimer(uint32_t aDelayTimer) { mDelayTimer = BigEndian::HostSwap32(aDelayTimer); }
+    static uint32_t CalculateRemainingDelay(const Tlv &aDelayTimerTlv, TimeMilli aUpdateTime);
 
-    static constexpr uint32_t kMaxDelayTimer = 259200; ///< Maximum delay timer value for a Pending Dataset in seconds
-
-    /**
-     * Minimum Delay Timer value for a Pending Operational Dataset (ms)
-     *
-     */
-    static constexpr uint32_t kDelayTimerMinimal = OPENTHREAD_CONFIG_TMF_PENDING_DATASET_MINIMUM_DELAY;
-
-    /**
-     * Default Delay Timer value for a Pending Operational Dataset (ms)
-     *
-     */
-    static constexpr uint32_t kDelayTimerDefault = OPENTHREAD_CONFIG_TMF_PENDING_DATASET_DEFAULT_DELAY;
-
-private:
-    uint32_t mDelayTimer;
-} OT_TOOL_PACKED_END;
-
-// forward declare ChannelMaskTlv
-class ChannelMaskTlv;
-
-/**
- * Implements Channel Mask Entry generation and parsing.
- *
- */
-OT_TOOL_PACKED_BEGIN
-class ChannelMaskEntryBase
-{
-public:
-    /**
-     * Gets the ChannelPage value.
-     *
-     * @returns The ChannelPage value.
-     *
-     */
-    uint8_t GetChannelPage(void) const { return mChannelPage; }
-
-    /**
-     * Sets the ChannelPage value.
-     *
-     * @param[in]  aChannelPage  The ChannelPage value.
-     *
-     */
-    void SetChannelPage(uint8_t aChannelPage) { mChannelPage = aChannelPage; }
-
-    /**
-     * Gets the MaskLength value.
-     *
-     * @returns The MaskLength value.
-     *
-     */
-    uint8_t GetMaskLength(void) const { return mMaskLength; }
-
-    /**
-     * Sets the MaskLength value.
-     *
-     * @param[in]  aMaskLength  The MaskLength value.
-     *
-     */
-    void SetMaskLength(uint8_t aMaskLength) { mMaskLength = aMaskLength; }
-
-    /**
-     * Returns the total size of this Channel Mask Entry including the mask.
-     *
-     * @returns The total size of this entry (number of bytes).
-     *
-     */
-    uint16_t GetEntrySize(void) const { return sizeof(ChannelMaskEntryBase) + mMaskLength; }
-
-    /**
-     * Clears the bit corresponding to @p aChannel in ChannelMask.
-     *
-     * @param[in]  aChannel  The channel in ChannelMask to clear.
-     *
-     */
-    void ClearChannel(uint8_t aChannel)
-    {
-        uint8_t *mask = reinterpret_cast<uint8_t *>(this) + sizeof(*this);
-        mask[aChannel / 8] &= ~(0x80 >> (aChannel % 8));
-    }
-
-    /**
-     * Sets the bit corresponding to @p aChannel in ChannelMask.
-     *
-     * @param[in]  aChannel  The channel in ChannelMask to set.
-     *
-     */
-    void SetChannel(uint8_t aChannel)
-    {
-        uint8_t *mask = reinterpret_cast<uint8_t *>(this) + sizeof(*this);
-        mask[aChannel / 8] |= 0x80 >> (aChannel % 8);
-    }
-
-    /**
-     * Indicates whether or not the bit corresponding to @p aChannel in ChannelMask is set.
-     *
-     * @param[in]  aChannel  The channel in ChannelMask to get.
-     *
-     */
-    bool IsChannelSet(uint8_t aChannel) const
-    {
-        const uint8_t *mask = reinterpret_cast<const uint8_t *>(this) + sizeof(*this);
-        return (aChannel < (mMaskLength * 8)) ? ((mask[aChannel / 8] & (0x80 >> (aChannel % 8))) != 0) : false;
-    }
-
-    /**
-     * Gets the next Channel Mask Entry in a Channel Mask TLV.
-     *
-     * @returns A pointer to next Channel Mask Entry.
-     *
-     */
-    const ChannelMaskEntryBase *GetNext(void) const
-    {
-        return reinterpret_cast<const ChannelMaskEntryBase *>(reinterpret_cast<const uint8_t *>(this) + GetEntrySize());
-    }
-
-    /**
-     * Gets the next Channel Mask Entry in a Channel Mask TLV.
-     *
-     * @returns A pointer to next Channel Mask Entry.
-     *
-     */
-    ChannelMaskEntryBase *GetNext(void) { return AsNonConst(AsConst(this)->GetNext()); }
-
-private:
-    uint8_t mChannelPage;
-    uint8_t mMaskLength;
-} OT_TOOL_PACKED_END;
-
-/**
- * Implements Channel Mask Entry Page 0 generation and parsing.
- *
- */
-OT_TOOL_PACKED_BEGIN
-class ChannelMaskEntry : public ChannelMaskEntryBase
-{
-public:
-    /**
-     * Initializes the entry.
-     *
-     */
-    void Init(void)
-    {
-        SetChannelPage(0);
-        SetMaskLength(sizeof(mMask));
-    }
-
-    /**
-     * Indicates whether or not the entry appears to be well-formed.
-     *
-     * @retval TRUE   If the entry appears to be well-formed.
-     * @retval FALSE  If the entry does not appear to be well-formed.
-     *
-     */
-    bool IsValid(void) const { return GetMaskLength() == sizeof(mMask); }
-
-    /**
-     * Returns the Channel Mask value as a `uint32_t` bit mask.
-     *
-     * @returns The Channel Mask value.
-     *
-     */
-    uint32_t GetMask(void) const { return Reverse32(BigEndian::HostSwap32(mMask)); }
-
-    /**
-     * Sets the Channel Mask value.
-     *
-     * @param[in]  aMask  The Channel Mask value.
-     *
-     */
-    void SetMask(uint32_t aMask) { mMask = BigEndian::HostSwap32(Reverse32(aMask)); }
-
-private:
-    uint32_t mMask;
-} OT_TOOL_PACKED_END;
+    static_assert(kMinDelay <= kMaxDelay, "TMF_PENDING_DATASET_MINIMUM_DELAY is larger than max allowed");
+    static_assert(kDefaultDelay <= kMaxDelay, "TMF_PENDING_DATASET_DEFAULT_DELAY is larger than max allowed");
+    static_assert(kDefaultDelay >= kMinDelay, "TMF_PENDING_DATASET_DEFAULT_DELAY is smaller than min allowed");
+};
 
 /**
  * Implements Channel Mask TLV generation and parsing.
- *
  */
 OT_TOOL_PACKED_BEGIN
-class ChannelMaskBaseTlv : public Tlv, public TlvInfo<Tlv::kChannelMask>
+class ChannelMaskTlv : public Tlv, public TlvInfo<Tlv::kChannelMask>
 {
+    static constexpr uint8_t kEntryHeaderSize = 2; // Two bytes: mChannelPage and mMaskLength
+    static constexpr uint8_t kEntrySize       = kEntryHeaderSize + sizeof(uint32_t);
+
 public:
     /**
-     * Initializes the TLV.
-     *
+     * Represents Channel Mask TLV value to append.
      */
-    void Init(void)
+    struct Value
     {
-        SetType(kChannelMask);
-        SetLength(sizeof(*this) - sizeof(Tlv));
-    }
+        static constexpr uint16_t kMaxLength = (kEntrySize * Radio::kNumChannelPages); ///< Max value length.
+
+        uint8_t mData[kMaxLength]; ///< Array to store TLV value (encoded as one or more Channel Mask TLV Entry)
+        uint8_t mLength;           ///< Value length in bytes.
+    };
+
+    ChannelMaskTlv(void) = delete;
 
     /**
-     * Indicates whether or not the TLV appears to be well-formed.
+     * Parses the Channel Mask TLV value and validates that all the included entries are well-formed.
      *
-     * @retval TRUE   If the TLV appears to be well-formed.
-     * @retval FALSE  If the TLV does not appear to be well-formed.
-     *
+     * @returns TRUE if the TLV is well-formed, FALSE otherwise.
      */
     bool IsValid(void) const;
 
     /**
-     * Gets the first Channel Mask Entry in the Channel Mask TLV.
+     * Parses and retrieves the combined channel mask for all supported channel pages from entries in the TLV.
      *
-     * @returns A pointer to first Channel Mask Entry or `nullptr` if not found.
+     * @param[out] aChannelMask  A reference to return the channel mask.
      *
+     * @retval kErrorNone   Successfully parsed the TLV value, @p aChannelMask is updated.
+     * @retval kErrorParse  TLV value is not well-formed.
      */
-    const ChannelMaskEntryBase *GetFirstEntry(void) const;
+    Error ReadChannelMask(uint32_t &aChannelMask) const;
 
     /**
-     * Gets the first Channel Mask Entry in the Channel Mask TLV.
+     * Searches within a given message for Channel Mask TLV, parses and validates the TLV value and returns the
+     * combined channel mask for all supported channel pages included in the TLV.
      *
-     * @returns A pointer to first Channel Mask Entry or `nullptr` if not found.
+     * @param[in]  aMessage      The message to search in.
+     * @param[out] aChannelMask  A reference to return the channel mask.
      *
+     * @retval kErrorNone       Found the TLV, successfully parsed its value, @p aChannelMask is updated.
+     * @retval kErrorNotFound   No Channel Mask TLV found in the @p aMessage.
+     * @retval kErrorParse      Found the TLV, but failed to parse it.
      */
-    ChannelMaskEntryBase *GetFirstEntry(void);
-} OT_TOOL_PACKED_END;
-
-/**
- * Implements Channel Mask TLV generation and parsing.
- *
- */
-OT_TOOL_PACKED_BEGIN
-class ChannelMaskTlv : public ChannelMaskBaseTlv
-{
-public:
-    /**
-     * Initializes the TLV.
-     *
-     */
-    void Init(void)
-    {
-        SetType(kChannelMask);
-        SetLength(sizeof(*this) - sizeof(Tlv));
-        memset(mEntries, 0, sizeof(mEntries));
-    }
+    static Error FindIn(const Message &aMessage, uint32_t &aChannelMask);
 
     /**
-     * Sets the Channel Mask Entries.
+     * Prepares Channel Mask TLV value for appending/writing.
      *
-     * @param[in]  aChannelMask  The Channel Mask value.
-     *
+     * @param[out] aValue        A reference to `Value` structure to populate.
+     * @param[in]  aChannelMask  The combined channel mask for all supported channel pages.
      */
-    void SetChannelMask(uint32_t aChannelMask);
+    static void PrepareValue(Value &aValue, uint32_t aChannelMask);
 
     /**
-     * Returns the Channel Mask value as a `uint32_t` bit mask.
+     * Prepares a Channel Mask TLV value and appends the TLV to a given message.
      *
-     * @returns The Channel Mask or 0 if not found.
+     * @param[in] aMessage       The message to append to.
+     * @param[in] aChannelMask   The combined channel mask for all supported channel pages.
      *
+     * @retval kErrorNone    Successfully prepared the Channel Mask TLV and appended it to @p aMessage.
+     * @retval kErrorNoBufs  Insufficient available buffers to grow the message.
      */
-    uint32_t GetChannelMask(void) const;
-
-    /**
-     * Reads message and returns the Channel Mask value as a `uint32_t` bit mask.
-     *
-     * @param[in]   aMessage     A reference to the message.
-     *
-     * @returns The Channel Mask or 0 if not found.
-     *
-     */
-    static uint32_t GetChannelMask(const Message &aMessage);
+    static Error AppendTo(Message &aMessage, uint32_t aChannelMask);
 
 private:
-    static constexpr uint8_t kNumMaskEntries = Radio::kNumChannelPages;
+    static constexpr uint8_t kMaskLength = sizeof(uint32_t);
 
-    ChannelMaskEntry mEntries[kNumMaskEntries];
-} OT_TOOL_PACKED_END;
+    OT_TOOL_PACKED_BEGIN
+    class Entry
+    {
+    public:
+        uint8_t  GetChannelPage(void) const { return mChannelPage; }
+        void     SetChannelPage(uint8_t aChannelPage) { mChannelPage = aChannelPage; }
+        uint8_t  GetMaskLength(void) const { return mMaskLength; }
+        void     SetMaskLength(uint8_t aMaskLength) { mMaskLength = aMaskLength; }
+        uint32_t GetMask(void) const { return Reverse32(BigEndian::HostSwap32(mMask)); }
+        void     SetMask(uint32_t aMask) { mMask = BigEndian::HostSwap32(Reverse32(aMask)); }
+
+    private:
+        uint8_t  mChannelPage;
+        uint8_t  mMaskLength;
+        uint32_t mMask;
+    } OT_TOOL_PACKED_END;
+
+    struct EntriesData : public Clearable<EntriesData>
+    {
+        // Represents received Channel Mask TLV Entries data which
+        // is either contained in `mData` buffer, or in `mMessage`
+        // at `mOffset`.
+
+        Error Parse(uint32_t &aChannelMask);
+
+        const uint8_t *mData;
+        const Message *mMessage;
+        OffsetRange    mOffsetRange;
+    };
+
+    uint8_t mEntriesStart;
+} OT_TOOL_PACKED_BEGIN;
 
 /**
  * Implements Energy List TLV generation and parsing.
- *
  */
 OT_TOOL_PACKED_BEGIN
 class EnergyListTlv : public Tlv, public TlvInfo<Tlv::kEnergyList>
@@ -1381,7 +698,6 @@ class EnergyListTlv : public Tlv, public TlvInfo<Tlv::kEnergyList>
 public:
     /**
      * Initializes the TLV.
-     *
      */
     void Init(void)
     {
@@ -1394,7 +710,6 @@ public:
      *
      * @retval TRUE   If the TLV appears to be well-formed.
      * @retval FALSE  If the TLV does not appear to be well-formed.
-     *
      */
     bool IsValid(void) const { return true; }
 
@@ -1402,7 +717,6 @@ public:
      * Returns a pointer to the start of energy measurement list.
      *
      * @returns A pointer to the start start of energy energy measurement list.
-     *
      */
     const uint8_t *GetEnergyList(void) const { return mEnergyList; }
 
@@ -1410,7 +724,6 @@ public:
      * Returns the length of energy measurement list.
      *
      * @returns The length of energy measurement list.
-     *
      */
     uint8_t GetEnergyListLength(void) const { return Min(kMaxListLength, GetLength()); }
 
@@ -1422,37 +735,31 @@ private:
 
 /**
  * Defines Provisioning TLV constants and types.
- *
  */
 typedef StringTlvInfo<Tlv::kProvisioningUrl, Tlv::kMaxProvisioningUrlLength> ProvisioningUrlTlv;
 
 /**
  * Defines Vendor Name TLV constants and types.
- *
  */
 typedef StringTlvInfo<Tlv::kVendorName, Tlv::kMaxVendorNameLength> VendorNameTlv;
 
 /**
  * Defines Vendor Model TLV constants and types.
- *
  */
 typedef StringTlvInfo<Tlv::kVendorModel, Tlv::kMaxVendorModelLength> VendorModelTlv;
 
 /**
  * Defines Vendor SW Version TLV constants and types.
- *
  */
 typedef StringTlvInfo<Tlv::kVendorSwVersion, Tlv::kMaxVendorSwVersionLength> VendorSwVersionTlv;
 
 /**
  * Defines Vendor Data TLV constants and types.
- *
  */
 typedef StringTlvInfo<Tlv::kVendorData, Tlv::kMaxVendorDataLength> VendorDataTlv;
 
 /**
  * Implements Vendor Stack Version TLV generation and parsing.
- *
  */
 OT_TOOL_PACKED_BEGIN
 class VendorStackVersionTlv : public Tlv, public TlvInfo<Tlv::kVendorStackVersion>
@@ -1460,7 +767,6 @@ class VendorStackVersionTlv : public Tlv, public TlvInfo<Tlv::kVendorStackVersio
 public:
     /**
      * Default constructor.
-     *
      */
     VendorStackVersionTlv(void)
         : mBuildRevision(0)
@@ -1470,7 +776,6 @@ public:
 
     /**
      * Initializes the TLV.
-     *
      */
     void Init(void)
     {
@@ -1483,7 +788,6 @@ public:
      *
      * @retval TRUE   If the TLV appears to be well-formed.
      * @retval FALSE  If the TLV does not appear to be well-formed.
-     *
      */
     bool IsValid(void) const { return GetLength() >= sizeof(*this) - sizeof(Tlv); }
 
@@ -1491,7 +795,6 @@ public:
      * Returns the Stack Vendor OUI value.
      *
      * @returns The Vendor Stack Vendor OUI value.
-     *
      */
     uint32_t GetOui(void) const { return BigEndian::ReadUint24(mOui); }
 
@@ -1499,7 +802,6 @@ public:
      * Returns the Stack Vendor OUI value.
      *
      * @param[in]  aOui  The Vendor Stack Vendor OUI value.
-     *
      */
     void SetOui(uint32_t aOui) { BigEndian::WriteUint24(aOui, mOui); }
 
@@ -1507,7 +809,6 @@ public:
      * Returns the Build value.
      *
      * @returns The Build value.
-     *
      */
     uint16_t GetBuild(void) const { return (BigEndian::HostSwap16(mBuildRevision) & kBuildMask) >> kBuildOffset; }
 
@@ -1515,7 +816,6 @@ public:
      * Sets the Build value.
      *
      * @param[in]  aBuild  The Build value.
-     *
      */
     void SetBuild(uint16_t aBuild)
     {
@@ -1527,7 +827,6 @@ public:
      * Returns the Revision value.
      *
      * @returns The Revision value.
-     *
      */
     uint8_t GetRevision(void) const { return (BigEndian::HostSwap16(mBuildRevision) & kRevMask) >> kRevOffset; }
 
@@ -1535,7 +834,6 @@ public:
      * Sets the Revision value.
      *
      * @param[in]  aRevision  The Revision value.
-     *
      */
     void SetRevision(uint8_t aRevision)
     {
@@ -1547,7 +845,6 @@ public:
      * Returns the Minor value.
      *
      * @returns The Minor value.
-     *
      */
     uint8_t GetMinor(void) const { return (mMinorMajor & kMinorMask) >> kMinorOffset; }
 
@@ -1555,7 +852,6 @@ public:
      * Sets the Minor value.
      *
      * @param[in]  aMinor  The Minor value.
-     *
      */
     void SetMinor(uint8_t aMinor)
     {
@@ -1566,7 +862,6 @@ public:
      * Returns the Major value.
      *
      * @returns The Major value.
-     *
      */
     uint8_t GetMajor(void) const { return (mMinorMajor & kMajorMask) >> kMajorOffset; }
 
@@ -1574,7 +869,6 @@ public:
      * Sets the Major value.
      *
      * @param[in] aMajor  The Major value.
-     *
      */
     void SetMajor(uint8_t aMajor)
     {
@@ -1601,13 +895,11 @@ private:
 
 /**
  * Defines UDP Encapsulation TLV types and constants.
- *
  */
 typedef TlvInfo<MeshCoP::Tlv::kUdpEncapsulation> UdpEncapsulationTlv;
 
 /**
  * Represents UDP Encapsulation TLV value header (source and destination ports).
- *
  */
 OT_TOOL_PACKED_BEGIN
 class UdpEncapsulationTlvHeader
@@ -1617,7 +909,6 @@ public:
      * Returns the source port.
      *
      * @returns The source port.
-     *
      */
     uint16_t GetSourcePort(void) const { return BigEndian::HostSwap16(mSourcePort); }
 
@@ -1625,7 +916,6 @@ public:
      * Updates the source port.
      *
      * @param[in]   aSourcePort     The source port.
-     *
      */
     void SetSourcePort(uint16_t aSourcePort) { mSourcePort = BigEndian::HostSwap16(aSourcePort); }
 
@@ -1633,7 +923,6 @@ public:
      * Returns the destination port.
      *
      * @returns The destination port.
-     *
      */
     uint16_t GetDestinationPort(void) const { return BigEndian::HostSwap16(mDestinationPort); }
 
@@ -1641,7 +930,6 @@ public:
      * Updates the destination port.
      *
      * @param[in]   aDestinationPort    The destination port.
-     *
      */
     void SetDestinationPort(uint16_t aDestinationPort) { mDestinationPort = BigEndian::HostSwap16(aDestinationPort); }
 
@@ -1652,8 +940,12 @@ private:
 } OT_TOOL_PACKED_END;
 
 /**
+ * Implements Thread Domain Name TLV type.
+ */
+typedef StringTlvInfo<Tlv::kThreadDomainName, Tlv::kMaxThreadDomainNameLength> ThreadDomainNameTlv;
+
+/**
  * Implements Discovery Request TLV generation and parsing.
- *
  */
 OT_TOOL_PACKED_BEGIN
 class DiscoveryRequestTlv : public Tlv, public TlvInfo<Tlv::kDiscoveryRequest>
@@ -1661,7 +953,6 @@ class DiscoveryRequestTlv : public Tlv, public TlvInfo<Tlv::kDiscoveryRequest>
 public:
     /**
      * Initializes the TLV.
-     *
      */
     void Init(void)
     {
@@ -1676,7 +967,6 @@ public:
      *
      * @retval TRUE   If the TLV appears to be well-formed.
      * @retval FALSE  If the TLV does not appear to be well-formed.
-     *
      */
     bool IsValid(void) const { return GetLength() >= sizeof(*this) - sizeof(Tlv); }
 
@@ -1684,7 +974,6 @@ public:
      * Returns the Version value.
      *
      * @returns The Version value.
-     *
      */
     uint8_t GetVersion(void) const { return mFlags >> kVersionOffset; }
 
@@ -1692,7 +981,6 @@ public:
      * Sets the Version value.
      *
      * @param[in]  aVersion  The Version value.
-     *
      */
     void SetVersion(uint8_t aVersion)
     {
@@ -1704,7 +992,6 @@ public:
      *
      * @retval TRUE   If the Joiner flag is set.
      * @retval FALSE  If the Joiner flag is not set.
-     *
      */
     bool IsJoiner(void) const { return (mFlags & kJoinerMask) != 0; }
 
@@ -1712,7 +999,6 @@ public:
      * Sets the Joiner flag.
      *
      * @param[in]  aJoiner  TRUE if set, FALSE otherwise.
-     *
      */
     void SetJoiner(bool aJoiner)
     {
@@ -1738,7 +1024,6 @@ private:
 
 /**
  * Implements Discovery Response TLV generation and parsing.
- *
  */
 OT_TOOL_PACKED_BEGIN
 class DiscoveryResponseTlv : public Tlv, public TlvInfo<Tlv::kDiscoveryResponse>
@@ -1746,7 +1031,6 @@ class DiscoveryResponseTlv : public Tlv, public TlvInfo<Tlv::kDiscoveryResponse>
 public:
     /**
      * Initializes the TLV.
-     *
      */
     void Init(void)
     {
@@ -1761,7 +1045,6 @@ public:
      *
      * @retval TRUE   If the TLV appears to be well-formed.
      * @retval FALSE  If the TLV does not appear to be well-formed.
-     *
      */
     bool IsValid(void) const { return GetLength() >= sizeof(*this) - sizeof(Tlv); }
 
@@ -1769,7 +1052,6 @@ public:
      * Returns the Version value.
      *
      * @returns The Version value.
-     *
      */
     uint8_t GetVersion(void) const { return mFlags >> kVersionOffset; }
 
@@ -1777,7 +1059,6 @@ public:
      * Sets the Version value.
      *
      * @param[in]  aVersion  The Version value.
-     *
      */
     void SetVersion(uint8_t aVersion)
     {
@@ -1789,7 +1070,6 @@ public:
      *
      * @retval TRUE   If the Native Commissioner flag is set.
      * @retval FALSE  If the Native Commissioner flag is not set.
-     *
      */
     bool IsNativeCommissioner(void) const { return (mFlags & kNativeMask) != 0; }
 
@@ -1797,7 +1077,6 @@ public:
      * Sets the Native Commissioner flag.
      *
      * @param[in]  aNativeCommissioner  TRUE if set, FALSE otherwise.
-     *
      */
     void SetNativeCommissioner(bool aNativeCommissioner)
     {
@@ -1816,25 +1095,23 @@ public:
      *
      * @retval TRUE   If the Commercial Commissioning Mode flag is set.
      * @retval FALSE  If the Commercial Commissioning Mode flag is not set.
-     *
      */
-    bool IsCommercialCommissioningMode(void) const { return (mFlags & kCCMMask) != 0; }
+    bool IsCommercialCommissioningMode(void) const { return (mFlags & kCcmMask) != 0; }
 
     /**
      * Sets the Commercial Commissioning Mode flag.
      *
-     * @param[in]  aCCM  TRUE if set, FALSE otherwise.
-     *
+     * @param[in]  aCcm  TRUE if set, FALSE otherwise.
      */
-    void SetCommercialCommissioningMode(bool aCCM)
+    void SetCommercialCommissioningMode(bool aCcm)
     {
-        if (aCCM)
+        if (aCcm)
         {
-            mFlags |= kCCMMask;
+            mFlags |= kCcmMask;
         }
         else
         {
-            mFlags &= ~kCCMMask;
+            mFlags &= ~kCcmMask;
         }
     }
 
@@ -1843,8 +1120,8 @@ private:
     static constexpr uint8_t kVersionMask   = 0xf << kVersionOffset;
     static constexpr uint8_t kNativeOffset  = 3;
     static constexpr uint8_t kNativeMask    = 1 << kNativeOffset;
-    static constexpr uint8_t kCCMOffset     = 2;
-    static constexpr uint8_t kCCMMask       = 1 << kCCMOffset;
+    static constexpr uint8_t kCcmOffset     = 2;
+    static constexpr uint8_t kCcmMask       = 1 << kCcmOffset;
 
     uint8_t mFlags;
     uint8_t mReserved;
@@ -1852,7 +1129,6 @@ private:
 
 /**
  * Implements Joiner Advertisement TLV generation and parsing.
- *
  */
 OT_TOOL_PACKED_BEGIN
 class JoinerAdvertisementTlv : public Tlv, public TlvInfo<Tlv::kJoinerAdvertisement>
@@ -1862,7 +1138,6 @@ public:
 
     /**
      * Initializes the TLV.
-     *
      */
     void Init(void)
     {
@@ -1875,7 +1150,6 @@ public:
      *
      * @retval TRUE   If the TLV appears to be well-formed.
      * @retval FALSE  If the TLV does not appear to be well-formed.
-     *
      */
     bool IsValid(void) const { return GetLength() >= sizeof(mOui) && GetLength() <= sizeof(mOui) + sizeof(mAdvData); }
 
@@ -1883,7 +1157,6 @@ public:
      * Returns the Vendor OUI value.
      *
      * @returns The Vendor OUI value.
-     *
      */
     uint32_t GetOui(void) const { return BigEndian::ReadUint24(mOui); }
 
@@ -1891,7 +1164,6 @@ public:
      * Sets the Vendor OUI value.
      *
      * @param[in]  aOui The Vendor OUI value.
-     *
      */
     void SetOui(uint32_t aOui) { return BigEndian::WriteUint24(aOui, mOui); }
 
@@ -1899,7 +1171,6 @@ public:
      * Returns the Adv Data length.
      *
      * @returns The AdvData length.
-     *
      */
     uint8_t GetAdvDataLength(void) const { return GetLength() - sizeof(mOui); }
 
@@ -1907,7 +1178,6 @@ public:
      * Returns the Adv Data value.
      *
      * @returns A pointer to the Adv Data value.
-     *
      */
     const uint8_t *GetAdvData(void) const { return mAdvData; }
 
@@ -1916,7 +1186,6 @@ public:
      *
      * @param[in]  aAdvData        A pointer to the AdvData value.
      * @param[in]  aAdvDataLength  The length of AdvData in bytes.
-     *
      */
     void SetAdvData(const uint8_t *aAdvData, uint8_t aAdvDataLength)
     {

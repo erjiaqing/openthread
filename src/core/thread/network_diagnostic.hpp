@@ -67,7 +67,6 @@ class Client;
 
 /**
  * Implements the Network Diagnostic server responding to requests.
- *
  */
 class Server : public InstanceLocator, private NonCopyable
 {
@@ -79,7 +78,6 @@ public:
      * Initializes the Server.
      *
      * @param[in] aInstance   The OpenThread instance.
-     *
      */
     explicit Server(Instance &aInstance);
 
@@ -88,7 +86,6 @@ public:
      * Returns the vendor name string.
      *
      * @returns The vendor name string.
-     *
      */
     const char *GetVendorName(void) const { return mVendorName; }
 
@@ -99,7 +96,6 @@ public:
      *
      * @retval kErrorNone         Successfully set the vendor name.
      * @retval kErrorInvalidArgs  @p aVendorName is not valid (too long or not UTF8).
-     *
      */
     Error SetVendorName(const char *aVendorName);
 
@@ -107,7 +103,6 @@ public:
      * Returns the vendor model string.
      *
      * @returns The vendor model string.
-     *
      */
     const char *GetVendorModel(void) const { return mVendorModel; }
 
@@ -118,7 +113,6 @@ public:
      *
      * @retval kErrorNone         Successfully set the vendor model.
      * @retval kErrorInvalidArgs  @p aVendorModel is not valid (too long or not UTF8).
-     *
      */
     Error SetVendorModel(const char *aVendorModel);
 
@@ -126,7 +120,6 @@ public:
      * Returns the vendor software version string.
      *
      * @returns The vendor software version string.
-     *
      */
     const char *GetVendorSwVersion(void) const { return mVendorSwVersion; }
 
@@ -137,14 +130,31 @@ public:
      *
      * @retval kErrorNone         Successfully set the vendor sw version.
      * @retval kErrorInvalidArgs  @p aVendorSwVersion is not valid (too long or not UTF8).
-     *
      */
     Error SetVendorSwVersion(const char *aVendorSwVersion);
+
+    /**
+     * Returns the vendor app URL string.
+     *
+     * @returns the vendor app URL string.
+     */
+    const char *GetVendorAppUrl(void) const { return mVendorAppUrl; }
+
+    /**
+     * Sets the vendor app URL string.
+     *
+     * @param[in] aVendorAppUrl     The vendor app URL string
+     *
+     * @retval kErrorNone         Successfully set the vendor app URL.
+     * @retval kErrorInvalidArgs  @p aVendorAppUrl is not valid (too long or not UTF8).
+     */
+    Error SetVendorAppUrl(const char *aVendorAppUrl);
 
 #else
     const char *GetVendorName(void) const { return kVendorName; }
     const char *GetVendorModel(void) const { return kVendorModel; }
     const char *GetVendorSwVersion(void) const { return kVendorSwVersion; }
+    const char *GetVendorAppUrl(void) const { return kVendorAppUrl; }
 #endif // OPENTHREAD_CONFIG_NET_DIAG_VENDOR_INFO_SET_API_ENABLE
 
 private:
@@ -173,6 +183,7 @@ private:
     static const char kVendorName[];
     static const char kVendorModel[];
     static const char kVendorSwVersion[];
+    static const char kVendorAppUrl[];
 
     Error AppendDiagTlv(uint8_t aTlvType, Message &aMessage);
     Error AppendIp6AddressList(Message &aMessage);
@@ -211,6 +222,7 @@ private:
     VendorNameTlv::StringType      mVendorName;
     VendorModelTlv::StringType     mVendorModel;
     VendorSwVersionTlv::StringType mVendorSwVersion;
+    VendorAppUrlTlv::StringType    mVendorAppUrl;
 #endif
 
 #if OPENTHREAD_FTD
@@ -226,7 +238,6 @@ DeclareTmfHandler(Server, kUriDiagnosticGetAnswer);
 
 /**
  * Implements the Network Diagnostic client sending requests and queries.
- *
  */
 class Client : public InstanceLocator, private NonCopyable
 {
@@ -245,7 +256,6 @@ public:
      * Initializes the Client.
      *
      * @param[in] aInstance   The OpenThread instance.
-     *
      */
     explicit Client(Instance &aInstance);
 
@@ -258,7 +268,6 @@ public:
      * @param[in]  aCount            Number of types in @p aTlvTypes.
      * @param[in]  aCallback         Callback when Network Diagnostic Get response is received (can be NULL).
      * @param[in]  Context           Application-specific context used with @p aCallback.
-     *
      */
     Error SendDiagnosticGet(const Ip6::Address &aDestination,
                             const uint8_t       aTlvTypes[],
@@ -272,7 +281,6 @@ public:
      * @param[in] aDestination  The destination address.
      * @param[in] aTlvTypes     An array of Network Diagnostic TLV types.
      * @param[in] aCount        Number of types in aTlvTypes
-     *
      */
     Error SendDiagnosticReset(const Ip6::Address &aDestination, const uint8_t aTlvTypes[], uint8_t aCount);
 
@@ -286,7 +294,6 @@ public:
      * @retval kErrorNone       Successfully found the next Network Diagnostic TLV.
      * @retval kErrorNotFound   No subsequent Network Diagnostic TLV exists in the message.
      * @retval kErrorParse      Parsing the next Network Diagnostic failed.
-     *
      */
     static Error GetNextDiagTlv(const Coap::Message &aMessage, Iterator &aIterator, TlvInfo &aTlvInfo);
 
@@ -294,7 +301,6 @@ public:
      * This method returns the query ID used for the last Network Diagnostic Query command.
      *
      * @returns The query ID used for last query.
-     *
      */
     uint16_t GetLastQueryId(void) const { return mQueryId; }
 

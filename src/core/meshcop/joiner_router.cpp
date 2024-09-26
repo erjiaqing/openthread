@@ -35,19 +35,7 @@
 
 #if OPENTHREAD_FTD
 
-#include <stdio.h>
-
-#include "common/as_core_type.hpp"
-#include "common/code_utils.hpp"
-#include "common/encoding.hpp"
-#include "common/locator_getters.hpp"
-#include "common/log.hpp"
 #include "instance/instance.hpp"
-#include "meshcop/meshcop.hpp"
-#include "meshcop/meshcop_tlvs.hpp"
-#include "thread/mle.hpp"
-#include "thread/thread_netif.hpp"
-#include "thread/uri_paths.hpp"
 
 namespace ot {
 namespace MeshCoP {
@@ -56,7 +44,7 @@ RegisterLogModule("JoinerRouter");
 
 JoinerRouter::JoinerRouter(Instance &aInstance)
     : InstanceLocator(aInstance)
-    , mSocket(aInstance)
+    , mSocket(aInstance, *this)
     , mTimer(aInstance)
     , mJoinerUdpPort(0)
     , mIsJoinerPortConfigured(false)
@@ -81,7 +69,7 @@ void JoinerRouter::Start(void)
 
         VerifyOrExit(!mSocket.IsBound());
 
-        IgnoreError(mSocket.Open(&JoinerRouter::HandleUdpReceive, this));
+        IgnoreError(mSocket.Open());
         IgnoreError(mSocket.Bind(port));
         IgnoreError(Get<Ip6::Filter>().AddUnsecurePort(port));
         LogInfo("Joiner Router: start");
@@ -126,11 +114,6 @@ void JoinerRouter::SetJoinerUdpPort(uint16_t aJoinerUdpPort)
     Start();
 }
 
-void JoinerRouter::HandleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo)
-{
-    static_cast<JoinerRouter *>(aContext)->HandleUdpReceive(AsCoreType(aMessage), AsCoreType(aMessageInfo));
-}
-
 void JoinerRouter::HandleUdpReceive(Message &aMessage, const Ip6::MessageInfo &aMessageInfo)
 {
     Error            error;
@@ -138,6 +121,7 @@ void JoinerRouter::HandleUdpReceive(Message &aMessage, const Ip6::MessageInfo &a
     Tmf::MessageInfo messageInfo(GetInstance());
     ExtendedTlv      tlv;
     uint16_t         borderAgentRloc;
+    OffsetRange      offsetRange;
 
     LogInfo("JoinerRouter::HandleUdpReceive");
 
@@ -150,10 +134,12 @@ void JoinerRouter::HandleUdpReceive(Message &aMessage, const Ip6::MessageInfo &a
     SuccessOrExit(error = Tlv::Append<JoinerIidTlv>(*message, aMessageInfo.GetPeerAddr().GetIid()));
     SuccessOrExit(error = Tlv::Append<JoinerRouterLocatorTlv>(*message, Get<Mle::MleRouter>().GetRloc16()));
 
+    offsetRange.InitFromMessageOffsetToEnd(aMessage);
+
     tlv.SetType(Tlv::kJoinerDtlsEncapsulation);
-    tlv.SetLength(aMessage.GetLength() - aMessage.GetOffset());
+    tlv.SetLength(offsetRange.GetLength());
     SuccessOrExit(error = message->Append(tlv));
-    SuccessOrExit(error = message->AppendBytesFromMessage(aMessage, aMessage.GetOffset(), tlv.GetLength()));
+    SuccessOrExit(error = message->AppendBytesFromMessage(aMessage, offsetRange));
 
     messageInfo.SetSockAddrToRlocPeerAddrTo(borderAgentRloc);
 
@@ -173,8 +159,7 @@ template <> void JoinerRouter::HandleTmf<kUriRelayTx>(Coap::Message &aMessage, c
     uint16_t                 joinerPort;
     Ip6::InterfaceIdentifier joinerIid;
     Kek                      kek;
-    uint16_t                 offset;
-    uint16_t                 length;
+    OffsetRange              offsetRange;
     Message                 *message = nullptr;
     Message::Settings        settings(Message::kNoLinkSecurity, Message::kPriorityNet);
     Ip6::MessageInfo         messageInfo;
@@ -186,11 +171,11 @@ template <> void JoinerRouter::HandleTmf<kUriRelayTx>(Coap::Message &aMessage, c
     SuccessOrExit(error = Tlv::Find<JoinerUdpPortTlv>(aMessage, joinerPort));
     SuccessOrExit(error = Tlv::Find<JoinerIidTlv>(aMessage, joinerIid));
 
-    SuccessOrExit(error = Tlv::FindTlvValueOffset(aMessage, Tlv::kJoinerDtlsEncapsulation, offset, length));
+    SuccessOrExit(error = Tlv::FindTlvValueOffsetRange(aMessage, Tlv::kJoinerDtlsEncapsulation, offsetRange));
 
     VerifyOrExit((message = mSocket.NewMessage(0, settings)) != nullptr, error = kErrorNoBufs);
 
-    SuccessOrExit(error = message->AppendBytesFromMessage(aMessage, offset, length));
+    SuccessOrExit(error = message->AppendBytesFromMessage(aMessage, offsetRange));
 
     messageInfo.GetPeerAddr().SetToLinkLocalAddress(joinerIid);
     messageInfo.SetPeerPort(joinerPort);
@@ -232,7 +217,7 @@ void JoinerRouter::DelaySendingJoinerEntrust(const Ip6::MessageInfo &aMessageInf
 
 exit:
     FreeMessageOnError(message, error);
-    LogError("schedule joiner entrust", error);
+    LogWarnOnError(error, "schedule joiner entrust");
 }
 
 void JoinerRouter::HandleTimer(void) { SendDelayedJoinerEntrust(); }
@@ -308,7 +293,7 @@ Coap::Message *JoinerRouter::PrepareJoinerEntrustMessage(void)
 
     for (Tlv::Type tlvType : kTlvTypes)
     {
-        const Tlv *tlv = dataset.GetTlv(tlvType);
+        const Tlv *tlv = dataset.FindTlv(tlvType);
 
         VerifyOrExit(tlv != nullptr, error = kErrorInvalidState);
         SuccessOrExit(error = tlv->AppendTo(*message));

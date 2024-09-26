@@ -37,11 +37,12 @@
 #include "openthread-core-config.h"
 
 #include <openthread/radio_stats.h>
+#include <openthread/platform/crypto.h>
 #include <openthread/platform/radio.h>
 
-#include <openthread/platform/crypto.h>
 #include "common/locator.hpp"
 #include "common/non_copyable.hpp"
+#include "common/numeric_limits.hpp"
 #include "common/time.hpp"
 #include "mac/mac_frame.hpp"
 
@@ -51,10 +52,11 @@ static constexpr uint32_t kUsPerTenSymbols = OT_US_PER_TEN_SYMBOLS; ///< Time fo
 static constexpr uint32_t kRadioHeaderShrDuration = 160;            ///< Duration of SHR in us
 static constexpr uint32_t kRadioHeaderPhrDuration = 32;             ///< Duration of PHR in us
 
+static constexpr int8_t kRadioPowerInvalid = OT_RADIO_POWER_INVALID; ///< Invalid TX power value
+
 #if OPENTHREAD_CONFIG_MAC_CSL_RECEIVER_ENABLE
 /**
  * Minimum CSL period supported in units of 10 symbols.
- *
  */
 static constexpr uint64_t kMinCslPeriod  = OPENTHREAD_CONFIG_MAC_CSL_MIN_PERIOD * 1000 / kUsPerTenSymbols;
 static constexpr uint64_t kMaxCslTimeout = OPENTHREAD_CONFIG_MAC_CSL_MAX_TIMEOUT;
@@ -67,14 +69,13 @@ static constexpr uint64_t kMaxCslTimeout = OPENTHREAD_CONFIG_MAC_CSL_MAX_TIMEOUT
  *   This module includes definitions for OpenThread radio abstraction.
  *
  * @{
- *
  */
 
 /**
  * Implements the radio statistics logic.
  *
  * The radio statistics are the time when the radio in TX/RX/radio state.
- * Since this class collects these statistics from pure software level and no platform API is involved, a simplied
+ * Since this class collects these statistics from pure software level and no platform API is involved, a simplified
  * model is used to calculate the time of different radio states. The data may not be very accurate, but it's
  * sufficient to provide a general understanding of the proportion of time a device is in different radio states.
  *
@@ -88,7 +89,6 @@ static constexpr uint64_t kMaxCslTimeout = OPENTHREAD_CONFIG_MAC_CSL_MAX_TIMEOUT
  *   will be reduced accordingly.
  * - When `GetStats` is called, an operation will be executed to calcute the time for the last state. And the result
  *   will be returned.
- *
  */
 #if OPENTHREAD_CONFIG_RADIO_STATS_ENABLE && (OPENTHREAD_FTD || OPENTHREAD_MTD)
 
@@ -126,7 +126,6 @@ private:
 
 /**
  * Represents an OpenThread radio abstraction.
- *
  */
 class Radio : public InstanceLocator, private NonCopyable
 {
@@ -136,32 +135,32 @@ public:
     static constexpr uint32_t kSymbolTime      = OT_RADIO_SYMBOL_TIME;
     static constexpr uint8_t  kSymbolsPerOctet = OT_RADIO_SYMBOLS_PER_OCTET;
     static constexpr uint32_t kPhyUsPerByte    = kSymbolsPerOctet * kSymbolTime;
+    static constexpr uint8_t  kChannelPage0    = OT_RADIO_CHANNEL_PAGE_0;
+    static constexpr uint8_t  kChannelPage2    = OT_RADIO_CHANNEL_PAGE_2;
 #if (OPENTHREAD_CONFIG_RADIO_2P4GHZ_OQPSK_SUPPORT && OPENTHREAD_CONFIG_RADIO_915MHZ_OQPSK_SUPPORT)
     static constexpr uint16_t kNumChannelPages = 2;
     static constexpr uint32_t kSupportedChannels =
         OT_RADIO_915MHZ_OQPSK_CHANNEL_MASK | OT_RADIO_2P4GHZ_OQPSK_CHANNEL_MASK;
-    static constexpr uint8_t  kChannelMin            = OT_RADIO_915MHZ_OQPSK_CHANNEL_MIN;
-    static constexpr uint8_t  kChannelMax            = OT_RADIO_2P4GHZ_OQPSK_CHANNEL_MAX;
-    static constexpr uint32_t kSupportedChannelPages = OT_RADIO_CHANNEL_PAGE_0_MASK | OT_RADIO_CHANNEL_PAGE_2_MASK;
+    static constexpr uint8_t kChannelMin = OT_RADIO_915MHZ_OQPSK_CHANNEL_MIN;
+    static constexpr uint8_t kChannelMax = OT_RADIO_2P4GHZ_OQPSK_CHANNEL_MAX;
 #elif OPENTHREAD_CONFIG_RADIO_915MHZ_OQPSK_SUPPORT
-    static constexpr uint16_t kNumChannelPages       = 1;
-    static constexpr uint32_t kSupportedChannels     = OT_RADIO_915MHZ_OQPSK_CHANNEL_MASK;
-    static constexpr uint8_t  kChannelMin            = OT_RADIO_915MHZ_OQPSK_CHANNEL_MIN;
-    static constexpr uint8_t  kChannelMax            = OT_RADIO_915MHZ_OQPSK_CHANNEL_MAX;
-    static constexpr uint32_t kSupportedChannelPages = OT_RADIO_CHANNEL_PAGE_2_MASK;
+    static constexpr uint16_t kNumChannelPages   = 1;
+    static constexpr uint32_t kSupportedChannels = OT_RADIO_915MHZ_OQPSK_CHANNEL_MASK;
+    static constexpr uint8_t  kChannelMin        = OT_RADIO_915MHZ_OQPSK_CHANNEL_MIN;
+    static constexpr uint8_t  kChannelMax        = OT_RADIO_915MHZ_OQPSK_CHANNEL_MAX;
 #elif OPENTHREAD_CONFIG_RADIO_2P4GHZ_OQPSK_SUPPORT
-    static constexpr uint16_t kNumChannelPages       = 1;
-    static constexpr uint32_t kSupportedChannels     = OT_RADIO_2P4GHZ_OQPSK_CHANNEL_MASK;
-    static constexpr uint8_t  kChannelMin            = OT_RADIO_2P4GHZ_OQPSK_CHANNEL_MIN;
-    static constexpr uint8_t  kChannelMax            = OT_RADIO_2P4GHZ_OQPSK_CHANNEL_MAX;
-    static constexpr uint32_t kSupportedChannelPages = OT_RADIO_CHANNEL_PAGE_0_MASK;
+    static constexpr uint16_t kNumChannelPages   = 1;
+    static constexpr uint32_t kSupportedChannels = OT_RADIO_2P4GHZ_OQPSK_CHANNEL_MASK;
+    static constexpr uint8_t  kChannelMin        = OT_RADIO_2P4GHZ_OQPSK_CHANNEL_MIN;
+    static constexpr uint8_t  kChannelMax        = OT_RADIO_2P4GHZ_OQPSK_CHANNEL_MAX;
 #elif OPENTHREAD_CONFIG_PLATFORM_RADIO_PROPRIETARY_SUPPORT
-    static constexpr uint16_t kNumChannelPages       = 1;
-    static constexpr uint32_t kSupportedChannels     = OPENTHREAD_CONFIG_PLATFORM_RADIO_PROPRIETARY_CHANNEL_MASK;
-    static constexpr uint8_t  kChannelMin            = OPENTHREAD_CONFIG_PLATFORM_RADIO_PROPRIETARY_CHANNEL_MIN;
-    static constexpr uint8_t  kChannelMax            = OPENTHREAD_CONFIG_PLATFORM_RADIO_PROPRIETARY_CHANNEL_MAX;
-    static constexpr uint32_t kSupportedChannelPages = (1 << OPENTHREAD_CONFIG_PLATFORM_RADIO_PROPRIETARY_CHANNEL_PAGE);
+    static constexpr uint16_t kNumChannelPages   = 1;
+    static constexpr uint32_t kSupportedChannels = OPENTHREAD_CONFIG_PLATFORM_RADIO_PROPRIETARY_CHANNEL_MASK;
+    static constexpr uint8_t  kChannelMin        = OPENTHREAD_CONFIG_PLATFORM_RADIO_PROPRIETARY_CHANNEL_MIN;
+    static constexpr uint8_t  kChannelMax        = OPENTHREAD_CONFIG_PLATFORM_RADIO_PROPRIETARY_CHANNEL_MAX;
 #endif
+
+    static const uint8_t kSupportedChannelPages[kNumChannelPages];
 
     static constexpr int8_t kInvalidRssi = OT_RADIO_RSSI_INVALID; ///< Invalid RSSI value.
 
@@ -176,7 +175,6 @@ public:
 
     /**
      * Defines the callbacks from `Radio`.
-     *
      */
     class Callbacks : public InstanceLocator
     {
@@ -190,7 +188,6 @@ public:
          * @param[in]  aError    kErrorNone when successfully received a frame,
          *                       kErrorAbort when reception was aborted and a frame was not received,
          *                       kErrorNoBufs when a frame could not be received due to lack of rx buffer space.
-         *
          */
         void HandleReceiveDone(Mac::RxFrame *aFrame, Error aError);
 
@@ -198,7 +195,6 @@ public:
          * This callback method handles a "Transmit Started" event from radio platform.
          *
          * @param[in]  aFrame     The frame that is being transmitted.
-         *
          */
         void HandleTransmitStarted(Mac::TxFrame &aFrame);
 
@@ -211,7 +207,6 @@ public:
          *                        kErrorNoAck when the frame was transmitted but no ACK was received,
          *                        kErrorChannelAccessFailure tx could not take place due to activity on the
          *                        channel, kErrorAbort when transmission was aborted for other reasons.
-         *
          */
         void HandleTransmitDone(Mac::TxFrame &aFrame, Mac::RxFrame *aAckFrame, Error aError);
 
@@ -222,9 +217,13 @@ public:
          * `otPlatRadioEnergyScanDone()`.
          *
          * @param[in]  aMaxRssi  The maximum RSSI encountered on the scanned channel.
-         *
          */
         void HandleEnergyScanDone(int8_t aMaxRssi);
+
+        /**
+         * This callback method handles "Bus Latency Changed" event from radio platform.
+         */
+        void HandleBusLatencyChanged(void);
 
 #if OPENTHREAD_CONFIG_DIAG_ENABLE
         /**
@@ -234,7 +233,6 @@ public:
          * @param[in]  aError    kErrorNone when successfully received a frame,
          *                       kErrorAbort when reception was aborted and a frame was not received,
          *                       kErrorNoBufs when a frame could not be received due to lack of rx buffer space.
-         *
          */
         void HandleDiagsReceiveDone(Mac::RxFrame *aFrame, Error aError);
 
@@ -246,7 +244,6 @@ public:
          *                        kErrorNoAck when the frame was transmitted but no ACK was received,
          *                        kErrorChannelAccessFailure tx could not take place due to activity on the
          *                        channel, kErrorAbort when transmission was aborted for other reasons.
-         *
          */
         void HandleDiagsTransmitDone(Mac::TxFrame &aFrame, Error aError);
 #endif
@@ -262,7 +259,6 @@ public:
      * Initializes the `Radio` object.
      *
      * @param[in]  aInstance  A reference to the OpenThread instance.
-     *
      */
     explicit Radio(Instance &aInstance)
         : InstanceLocator(aInstance)
@@ -274,7 +270,6 @@ public:
      * Gets the radio version string.
      *
      * @returns A pointer to the OpenThread radio version.
-     *
      */
     const char *GetVersionString(void);
 
@@ -282,7 +277,6 @@ public:
      * Gets the factory-assigned IEEE EUI-64 for the device.
      *
      * @param[out] aIeeeEui64  A reference to `Mac::ExtAddress` to place the factory-assigned IEEE EUI-64.
-     *
      */
     void GetIeeeEui64(Mac::ExtAddress &aIeeeEui64);
 
@@ -290,7 +284,6 @@ public:
      * Gets the radio capabilities.
      *
      * @returns The radio capability bit vector (see `OT_RADIO_CAP_*` definitions).
-     *
      */
     otRadioCaps GetCaps(void);
 
@@ -298,14 +291,12 @@ public:
      * Gets the radio receive sensitivity value.
      *
      * @returns The radio receive sensitivity value in dBm.
-     *
      */
     int8_t GetReceiveSensitivity(void) const;
 
 #if OPENTHREAD_RADIO
     /**
      * Initializes the states of the Thread radio.
-     *
      */
     void Init(void);
 #endif
@@ -314,7 +305,6 @@ public:
      * Sets the PAN ID for address filtering.
      *
      * @param[in] aPanId     The IEEE 802.15.4 PAN ID.
-     *
      */
     void SetPanId(Mac::PanId aPanId);
 
@@ -322,7 +312,6 @@ public:
      * Sets the Extended Address for address filtering.
      *
      * @param[in] aExtAddress  The IEEE 802.15.4 Extended Address stored in little-endian byte order.
-     *
      */
     void SetExtendedAddress(const Mac::ExtAddress &aExtAddress);
 
@@ -330,7 +319,6 @@ public:
      * Sets the Short Address for address filtering.
      *
      * @param[in] aShortAddress  The IEEE 802.15.4 Short Address.
-     *
      */
     void SetShortAddress(Mac::ShortAddress aShortAddress);
 
@@ -342,7 +330,6 @@ public:
      * @param[in] aPrevKey    The previous MAC key.
      * @param[in] aCurrKey    The current MAC key.
      * @param[in] aNextKey    The next MAC key.
-     *
      */
     void SetMacKey(uint8_t                 aKeyIdMode,
                    uint8_t                 aKeyId,
@@ -354,7 +341,6 @@ public:
      * Sets the current MAC Frame Counter value.
      *
      * @param[in] aMacFrameCounter  The MAC Frame Counter value.
-     *
      */
     void SetMacFrameCounter(uint32_t aMacFrameCounter)
     {
@@ -366,7 +352,6 @@ public:
      * value.
      *
      * @param[in] aMacFrameCounter  The MAC Frame Counter value.
-     *
      */
     void SetMacFrameCounterIfLarger(uint32_t aMacFrameCounter)
     {
@@ -380,7 +365,6 @@ public:
      *
      * @retval kErrorNone             Successfully retrieved the transmit power.
      * @retval kErrorNotImplemented   Transmit power configuration via dBm is not implemented.
-     *
      */
     Error GetTransmitPower(int8_t &aPower);
 
@@ -391,7 +375,6 @@ public:
      *
      * @retval kErrorNone             Successfully set the transmit power.
      * @retval kErrorNotImplemented   Transmit power configuration via dBm is not implemented.
-     *
      */
     Error SetTransmitPower(int8_t aPower);
 
@@ -402,7 +385,6 @@ public:
      *
      * @retval kErrorNone             A reference to output the CCA ED threshold in dBm.
      * @retval kErrorNotImplemented   CCA ED threshold configuration via dBm is not implemented.
-     *
      */
     Error GetCcaEnergyDetectThreshold(int8_t &aThreshold);
 
@@ -413,7 +395,6 @@ public:
      *
      * @retval kErrorNone             Successfully set the CCA ED threshold.
      * @retval kErrorNotImplemented   CCA ED threshold configuration via dBm is not implemented.
-     *
      */
     Error SetCcaEnergyDetectThreshold(int8_t aThreshold);
 
@@ -422,7 +403,6 @@ public:
      *
      * @retval TRUE   Promiscuous mode is enabled.
      * @retval FALSE  Promiscuous mode is disabled.
-     *
      */
     bool GetPromiscuous(void);
 
@@ -430,7 +410,6 @@ public:
      * Enables or disables promiscuous mode.
      *
      * @param[in]  aEnable   TRUE to enable or FALSE to disable promiscuous mode.
-     *
      */
     void SetPromiscuous(bool aEnable);
 
@@ -438,7 +417,6 @@ public:
      * Indicates whether radio should stay in Receive or Sleep during idle periods.
      *
      * @param[in]  aEnable   TRUE to keep radio in Receive, FALSE to put to Sleep during idle periods.
-     *
      */
     void SetRxOnWhenIdle(bool aEnable);
 
@@ -450,7 +428,6 @@ public:
      * @note This function may be not implemented. In this case it always returns OT_RADIO_STATE_INVALID state.
      *
      * @return  Current state of the radio.
-     *
      */
     otRadioState GetState(void);
 
@@ -459,7 +436,6 @@ public:
      *
      * @retval kErrorNone     Successfully enabled.
      * @retval kErrorFailed   The radio could not be enabled.
-     *
      */
     Error Enable(void);
 
@@ -468,7 +444,6 @@ public:
      *
      * @retval kErrorNone           Successfully transitioned to Disabled.
      * @retval kErrorInvalidState   The radio was not in sleep state.
-     *
      */
     Error Disable(void);
 
@@ -476,7 +451,6 @@ public:
      * Indicates whether radio is enabled or not.
      *
      * @returns TRUE if the radio is enabled, FALSE otherwise.
-     *
      */
     bool IsEnabled(void);
 
@@ -486,7 +460,6 @@ public:
      * @retval kErrorNone          Successfully transitioned to Sleep.
      * @retval kErrorBusy          The radio was transmitting.
      * @retval kErrorInvalidState  The radio was disabled.
-     *
      */
     Error Sleep(void);
 
@@ -497,7 +470,6 @@ public:
      *
      * @retval kErrorNone          Successfully transitioned to Receive.
      * @retval kErrorInvalidState  The radio was disabled or transmitting.
-     *
      */
     Error Receive(uint8_t aChannel);
 
@@ -506,7 +478,6 @@ public:
      * Updates the CSL sample time in radio.
      *
      * @param[in]  aCslSampleTime  The CSL sample time.
-     *
      */
     void UpdateCslSampleTime(uint32_t aCslSampleTime);
 
@@ -519,11 +490,11 @@ public:
      *
      * @retval kErrorNone    Successfully scheduled receive window.
      * @retval kErrorFailed  The receive window could not be scheduled.
-     *
      */
     Error ReceiveAt(uint8_t aChannel, uint32_t aStart, uint32_t aDuration);
 
-    /** Enables CSL sampling in radio.
+    /**
+     * Enables CSL sampling in radio.
      *
      * @param[in]  aCslPeriod    CSL period, 0 for disabling CSL.
      * @param[in]  aShortAddr    The short source address of CSL receiver's peer.
@@ -534,9 +505,17 @@ public:
      * @retval  kErrorNotImplemented Radio driver doesn't support CSL.
      * @retval  kErrorFailed         Other platform specific errors.
      * @retval  kErrorNone           Successfully enabled or disabled CSL.
-     *
      */
     Error EnableCsl(uint32_t aCslPeriod, otShortAddress aShortAddr, const otExtAddress *aExtAddr);
+
+    /**
+     * Resets CSL receiver in radio.
+     *
+     * @retval  kErrorNotImplemented Radio driver doesn't support CSL.
+     * @retval  kErrorFailed         Other platform specific errors.
+     * @retval  kErrorNone           Successfully disabled CSL.
+     */
+    Error ResetCsl(void);
 #endif // OPENTHREAD_CONFIG_MAC_CSL_RECEIVER_ENABLE
 
 #if OPENTHREAD_CONFIG_MAC_CSL_RECEIVER_ENABLE || OPENTHREAD_CONFIG_MAC_CSL_TRANSMITTER_ENABLE
@@ -546,7 +525,6 @@ public:
      * @note Platforms may optimize this value based on operational conditions (i.e.: temperature).
      *
      * @returns The current CSL rx/tx scheduling drift, in units of ± ppm.
-     *
      */
     uint8_t GetCslAccuracy(void);
 
@@ -554,7 +532,6 @@ public:
      * Get the fixed uncertainty of the Device for scheduling CSL operations in units of 10 microseconds.
      *
      * @returns The CSL Uncertainty in units of 10 us.
-     *
      */
     uint8_t GetCslUncertainty(void);
 #endif // OPENTHREAD_CONFIG_MAC_CSL_RECEIVER_ENABLE || OPENTHREAD_CONFIG_MAC_CSL_TRANSMITTER_ENABLE
@@ -565,7 +542,6 @@ public:
      * OpenThread forms the IEEE 802.15.4 frame in this buffer then calls `Transmit()` to request transmission.
      *
      * @returns A reference to the transmit frame buffer.
-     *
      */
     Mac::TxFrame &GetTransmitBuffer(void);
 
@@ -579,7 +555,6 @@ public:
      *
      * @retval kErrorNone          Successfully transitioned to Transmit.
      * @retval kErrorInvalidState  The radio was not in the Receive state.
-     *
      */
     Error Transmit(Mac::TxFrame &aFrame);
 
@@ -587,7 +562,6 @@ public:
      * Gets the most recent RSSI measurement.
      *
      * @returns The RSSI in dBm when it is valid.  127 when RSSI is invalid.
-     *
      */
     int8_t GetRssi(void);
 
@@ -602,7 +576,6 @@ public:
      * @retval kErrorNone            Successfully started scanning the channel.
      * @retval kErrorBusy            The radio is performing energy scanning.
      * @retval kErrorNotImplemented  The radio doesn't support energy scanning.
-     *
      */
     Error EnergyScan(uint8_t aScanChannel, uint16_t aScanDuration);
 
@@ -621,7 +594,6 @@ public:
      * address or an extended/long address can be added to the source address match table.
      *
      * @param[in]  aEnable     Enable/disable source address match feature.
-     *
      */
     void EnableSrcMatch(bool aEnable);
 
@@ -632,7 +604,6 @@ public:
      *
      * @retval kErrorNone     Successfully added short address to the source match table.
      * @retval kErrorNoBufs   No available entry in the source match table.
-     *
      */
     Error AddSrcMatchShortEntry(Mac::ShortAddress aShortAddress);
 
@@ -643,7 +614,6 @@ public:
      *
      * @retval kErrorNone     Successfully added extended address to the source match table.
      * @retval kErrorNoBufs   No available entry in the source match table.
-     *
      */
     Error AddSrcMatchExtEntry(const Mac::ExtAddress &aExtAddress);
 
@@ -654,7 +624,6 @@ public:
      *
      * @retval kErrorNone       Successfully removed short address from the source match table.
      * @retval kErrorNoAddress  The short address is not in source address match table.
-     *
      */
     Error ClearSrcMatchShortEntry(Mac::ShortAddress aShortAddress);
 
@@ -665,19 +634,16 @@ public:
      *
      * @retval kErrorNone       Successfully removed the extended address from the source match table.
      * @retval kErrorNoAddress  The extended address is not in source address match table.
-     *
      */
     Error ClearSrcMatchExtEntry(const Mac::ExtAddress &aExtAddress);
 
     /**
      * Clears all short addresses from the source address match table.
-     *
      */
     void ClearSrcMatchShortEntries(void);
 
     /**
      * Clears all the extended/long addresses from source address match table.
-     *
      */
     void ClearSrcMatchExtEntries(void);
 
@@ -685,7 +651,6 @@ public:
      * Gets the radio supported channel mask that the device is allowed to be on.
      *
      * @returns The radio supported channel mask.
-     *
      */
     uint32_t GetSupportedChannelMask(void);
 
@@ -693,7 +658,6 @@ public:
      * Gets the radio preferred channel mask that the device prefers to form on.
      *
      * @returns The radio preferred channel mask.
-     *
      */
     uint32_t GetPreferredChannelMask(void);
 
@@ -718,7 +682,6 @@ public:
      * @retval kErrorNotFound        The Initiator indicated by @p aShortAddress is not found when trying to clear.
      * @retval kErrorNoBufs          No more Initiator can be supported.
      * @retval kErrorNotImplemented  Radio driver doesn't support Enhanced-ACK Probing.
-     *
      */
     Error ConfigureEnhAckProbing(otLinkMetrics            aLinkMetrics,
                                  const Mac::ShortAddress &aShortAddress,
@@ -733,7 +696,6 @@ public:
      *
      * @retval true   The channel is valid.
      * @retval false  The channel is invalid.
-     *
      */
     static bool IsCslChannelValid(uint8_t aCslChannel)
     {
@@ -752,7 +714,6 @@ public:
      * @retval  kErrorFailed          Other platform specific errors.
      * @retval  kErrorNone            Successfully set region code.
      * @retval  kErrorNotImplemented  The feature is not implemented.
-     *
      */
     Error SetRegion(uint16_t aRegionCode) { return otPlatRadioSetRegion(GetInstancePtr(), aRegionCode); }
 
@@ -767,9 +728,63 @@ public:
      * @retval  kErrorFailed          Other platform specific errors.
      * @retval  kErrorNone            Successfully set region code.
      * @retval  kErrorNotImplemented  The feature is not implemented.
-     *
      */
     Error GetRegion(uint16_t &aRegionCode) const { return otPlatRadioGetRegion(GetInstancePtr(), &aRegionCode); }
+
+    /**
+     * Indicates whether a given channel page is supported based on the current configurations.
+     *
+     * @param[in] aChannelPage The channel page to check.
+     *
+     * @retval TRUE    The @p aChannelPage is supported by radio.
+     * @retval FALASE  The @p aChannelPage is not supported by radio.
+     */
+    static constexpr bool SupportsChannelPage(uint8_t aChannelPage)
+    {
+#if OPENTHREAD_CONFIG_RADIO_2P4GHZ_OQPSK_SUPPORT && OPENTHREAD_CONFIG_RADIO_915MHZ_OQPSK_SUPPORT
+        return (aChannelPage == kChannelPage0) || (aChannelPage == kChannelPage2);
+#elif OPENTHREAD_CONFIG_RADIO_2P4GHZ_OQPSK_SUPPORT
+        return (aChannelPage == kChannelPage0);
+#elif OPENTHREAD_CONFIG_RADIO_915MHZ_OQPSK_SUPPORT
+        return (aChannelPage == kChannelPage2);
+#elif OPENTHREAD_CONFIG_PLATFORM_RADIO_PROPRIETARY_SUPPORT
+        return (aChannelPage == OPENTHREAD_CONFIG_PLATFORM_RADIO_PROPRIETARY_CHANNEL_PAGE);
+#endif
+    }
+
+    /**
+     * Returns the channel mask for a given channel page if supported by the radio.
+     *
+     * @param[in] aChannelPage   The channel page.
+     *
+     * @returns The channel mask for @p aChannelPage if page is supported by the radio, otherwise zero.
+     */
+    static uint32_t ChannelMaskForPage(uint8_t aChannelPage)
+    {
+        uint32_t mask = 0;
+
+#if OPENTHREAD_CONFIG_RADIO_2P4GHZ_OQPSK_SUPPORT
+        if (aChannelPage == kChannelPage0)
+        {
+            mask = OT_RADIO_2P4GHZ_OQPSK_CHANNEL_MASK;
+        }
+#endif
+
+#if OPENTHREAD_CONFIG_RADIO_915MHZ_OQPSK_SUPPORT
+        if (aChannelPage == kChannelPage1)
+        {
+            mask = OT_RADIO_915MHZ_OQPSK_CHANNEL_MASK;
+        }
+#endif
+
+#if OPENTHREAD_CONFIG_PLATFORM_RADIO_PROPRIETARY_SUPPORT
+        if (aChannelPage == OPENTHREAD_CONFIG_PLATFORM_RADIO_PROPRIETARY_CHANNEL_PAGE)
+        {
+            mask = OPENTHREAD_CONFIG_PLATFORM_RADIO_PROPRIETARY_CHANNEL_MASK;
+        }
+#endif
+        return mask;
+    }
 
 private:
     otInstance *GetInstancePtr(void) const { return reinterpret_cast<otInstance *>(&InstanceLocator::GetInstance()); }
@@ -901,6 +916,8 @@ inline Error Radio::EnableCsl(uint32_t aCslPeriod, otShortAddress aShortAddr, co
 {
     return otPlatRadioEnableCsl(GetInstancePtr(), aCslPeriod, aShortAddr, aExtAddr);
 }
+
+inline Error Radio::ResetCsl(void) { return otPlatRadioResetCsl(GetInstancePtr()); }
 #endif
 
 #if OPENTHREAD_CONFIG_MAC_CSL_RECEIVER_ENABLE || OPENTHREAD_CONFIG_MAC_CSL_TRANSMITTER_ENABLE
@@ -1007,12 +1024,14 @@ inline Error Radio::EnableCsl(uint32_t, otShortAddress aShortAddr, const otExtAd
 {
     return kErrorNotImplemented;
 }
+
+inline Error Radio::ResetCsl(void) { return kErrorNotImplemented; }
 #endif
 
 #if OPENTHREAD_CONFIG_MAC_CSL_RECEIVER_ENABLE || OPENTHREAD_CONFIG_MAC_CSL_TRANSMITTER_ENABLE
-inline uint8_t Radio::GetCslAccuracy(void) { return UINT8_MAX; }
+inline uint8_t Radio::GetCslAccuracy(void) { return NumericLimits<uint8_t>::kMax; }
 
-inline uint8_t Radio::GetCslUncertainty(void) { return UINT8_MAX; }
+inline uint8_t Radio::GetCslUncertainty(void) { return NumericLimits<uint8_t>::kMax; }
 #endif
 
 inline Mac::TxFrame &Radio::GetTransmitBuffer(void)

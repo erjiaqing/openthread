@@ -33,19 +33,13 @@
 
 #include "udp6.hpp"
 
-#include <stdio.h>
-
-#include <openthread/platform/udp.h>
-
-#include "common/code_utils.hpp"
-#include "common/encoding.hpp"
-#include "common/locator_getters.hpp"
 #include "instance/instance.hpp"
-#include "net/checksum.hpp"
-#include "net/ip6.hpp"
 
 namespace ot {
 namespace Ip6 {
+
+//---------------------------------------------------------------------------------------------------------------------
+// Udp::SocketHandle
 
 bool Udp::SocketHandle::Matches(const MessageInfo &aMessageInfo) const
 {
@@ -71,10 +65,15 @@ exit:
     return matches;
 }
 
-Udp::Socket::Socket(Instance &aInstance)
+//---------------------------------------------------------------------------------------------------------------------
+// Udp::Socket
+
+Udp::Socket::Socket(Instance &aInstance, ReceiveHandler aHandler, void *aContext)
     : InstanceLocator(aInstance)
 {
     Clear();
+    mHandler = aHandler;
+    mContext = aContext;
 }
 
 Message *Udp::Socket::NewMessage(void) { return NewMessage(0); }
@@ -86,7 +85,7 @@ Message *Udp::Socket::NewMessage(uint16_t aReserved, const Message::Settings &aS
     return Get<Udp>().NewMessage(aReserved, aSettings);
 }
 
-Error Udp::Socket::Open(otUdpReceive aHandler, void *aContext) { return Get<Udp>().Open(*this, aHandler, aContext); }
+Error Udp::Socket::Open(void) { return Get<Udp>().Open(*this, mHandler, mContext); }
 
 bool Udp::Socket::IsOpen(void) const { return Get<Udp>().IsOpen(*this); }
 
@@ -147,6 +146,9 @@ exit:
 }
 #endif
 
+//---------------------------------------------------------------------------------------------------------------------
+// Udp
+
 Udp::Udp(Instance &aInstance)
     : InstanceLocator(aInstance)
     , mEphemeralPort(kDynamicPortMin)
@@ -169,14 +171,13 @@ exit:
     return error;
 }
 
-Error Udp::Open(SocketHandle &aSocket, otUdpReceive aHandler, void *aContext)
+Error Udp::Open(SocketHandle &aSocket, ReceiveHandler aHandler, void *aContext)
 {
     Error error = kErrorNone;
 
     OT_ASSERT(!IsOpen(aSocket));
 
-    aSocket.GetSockName().Clear();
-    aSocket.GetPeerName().Clear();
+    aSocket.Clear();
     aSocket.mHandler = aHandler;
     aSocket.mContext = aContext;
 
@@ -551,6 +552,12 @@ bool Udp::ShouldUsePlatformUdp(uint16_t aPort) const
 #endif
 #if OPENTHREAD_FTD
             && aPort != Get<MeshCoP::JoinerRouter>().GetJoinerUdpPort()
+#endif
+#if OPENTHREAD_CONFIG_DHCP6_SERVER_ENABLE
+            && aPort != Dhcp6::kDhcpServerPort
+#endif
+#if OPENTHREAD_CONFIG_DHCP6_CLIENT_ENABLE
+            && aPort != Dhcp6::kDhcpClientPort
 #endif
     );
 }

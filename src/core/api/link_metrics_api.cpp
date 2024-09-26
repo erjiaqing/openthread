@@ -34,10 +34,8 @@
 #include "openthread-core-config.h"
 
 #if OPENTHREAD_CONFIG_MLE_LINK_METRICS_INITIATOR_ENABLE
-#include <openthread/link_metrics.h>
 
-#include "common/as_core_type.hpp"
-#include "common/locator_getters.hpp"
+#include "instance/instance.hpp"
 
 using namespace ot;
 
@@ -99,6 +97,11 @@ otError otLinkMetricsSendLinkProbe(otInstance         *aInstance,
 }
 
 #if OPENTHREAD_CONFIG_LINK_METRICS_MANAGER_ENABLE
+bool otLinkMetricsManagerIsEnabled(otInstance *aInstance)
+{
+    return AsCoreType(aInstance).Get<Utils::LinkMetricsManager>().IsEnabled();
+}
+
 void otLinkMetricsManagerSetEnabled(otInstance *aInstance, bool aEnable)
 {
     AsCoreType(aInstance).Get<Utils::LinkMetricsManager>().SetEnabled(aEnable);

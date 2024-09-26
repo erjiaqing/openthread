@@ -34,10 +34,6 @@
 
 #if OPENTHREAD_CONFIG_RADIO_LINK_TREL_ENABLE
 
-#include "common/code_utils.hpp"
-#include "common/debug.hpp"
-#include "common/locator_getters.hpp"
-#include "common/log.hpp"
 #include "instance/instance.hpp"
 
 namespace ot {
@@ -55,9 +51,9 @@ Link::Link(Instance &aInstance)
     , mTimer(aInstance)
     , mInterface(aInstance)
 {
-    memset(&mTxFrame, 0, sizeof(mTxFrame));
-    memset(&mRxFrame, 0, sizeof(mRxFrame));
-    memset(mAckFrameBuffer, 0, sizeof(mAckFrameBuffer));
+    ClearAllBytes(mTxFrame);
+    ClearAllBytes(mRxFrame);
+    ClearAllBytes(mAckFrameBuffer);
 
     mTxFrame.mPsdu = &mTxPacketBuffer[kMaxHeaderSize];
     mTxFrame.SetLength(0);

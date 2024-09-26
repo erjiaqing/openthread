@@ -31,13 +31,30 @@
 
 /**
  * This header file defines the OpenThread core configuration options for toranj with POSIX platform.
- *
  */
 
 // Include the common configuration for all platforms.
 #include "openthread-core-toranj-config.h"
 
 #define OPENTHREAD_CONFIG_PLATFORM_INFO "POSIX-toranj"
+
+#define OPENTHREAD_CONFIG_MULTICAST_DNS_ENABLE 1
+
+#define OPENTHREAD_CONFIG_MULTICAST_DNS_ENABLE 1
+
+#define OPENTHREAD_CONFIG_MULTICAST_DNS_PUBLIC_API_ENABLE 1
+
+#define OPENTHREAD_CONFIG_PLATFORM_DNSSD_ENABLE 0
+
+#ifdef __linux__
+#define OPENTHREAD_CONFIG_BACKBONE_ROUTER_ENABLE 1
+#endif
+
+#ifndef OPENTHREAD_CONFIG_PLATFORM_UDP_ENABLE
+#define OPENTHREAD_CONFIG_PLATFORM_UDP_ENABLE 0
+#endif
+
+#define OPENTHREAD_CONFIG_PLATFORM_NETIF_ENABLE 1
 
 #define OPENTHREAD_CONFIG_LOG_OUTPUT OPENTHREAD_CONFIG_LOG_OUTPUT_PLATFORM_DEFINED
 
@@ -46,6 +63,8 @@
 #define OPENTHREAD_POSIX_CONFIG_RCP_PTY_ENABLE 1
 
 #define OPENTHREAD_POSIX_CONFIG_SPINEL_HDLC_INTERFACE_ENABLE 1
+
+#define OPENTHREAD_POSIX_CONFIG_NAT64_AIL_PREFIX_ENABLE 1
 
 // Disabled explicitly on posix `toranj` to validate the build with this config
 #define OPENTHREAD_CONFIG_BORDER_ROUTING_USE_HEAP_ENABLE 0

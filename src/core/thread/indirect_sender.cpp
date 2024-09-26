@@ -35,13 +35,7 @@
 
 #if OPENTHREAD_FTD
 
-#include "common/code_utils.hpp"
-#include "common/locator_getters.hpp"
-#include "common/message.hpp"
 #include "instance/instance.hpp"
-#include "thread/child.hpp"
-#include "thread/mesh_forwarder.hpp"
-#include "thread/mle_tlvs.hpp"
 
 namespace ot {
 
@@ -370,7 +364,7 @@ uint16_t IndirectSender::PrepareDataFrame(Mac::TxFrame &aFrame, Child &aChild, M
 
     Get<MeshForwarder>().GetMacSourceAddress(ip6Header.GetSource(), macAddrs.mSource);
 
-    if (ip6Header.GetDestination().IsLinkLocal())
+    if (ip6Header.GetDestination().IsLinkLocalUnicast())
     {
         Get<MeshForwarder>().GetMacDestinationAddress(ip6Header.GetDestination(), macAddrs.mDestination);
     }

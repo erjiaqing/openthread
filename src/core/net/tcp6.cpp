@@ -31,23 +31,11 @@
  *   This file implements TCP/IPv6 sockets.
  */
 
-#include "openthread-core-config.h"
+#include "tcp6.hpp"
 
 #if OPENTHREAD_CONFIG_TCP_ENABLE
 
-#include "tcp6.hpp"
-
-#include "common/as_core_type.hpp"
-#include "common/code_utils.hpp"
-#include "common/error.hpp"
-#include "common/locator_getters.hpp"
-#include "common/log.hpp"
-#include "common/num_utils.hpp"
-#include "common/random.hpp"
 #include "instance/instance.hpp"
-#include "net/checksum.hpp"
-#include "net/ip6.hpp"
-#include "net/netif.hpp"
 
 #include "../../third_party/tcplp/tcplp.h"
 
@@ -81,7 +69,7 @@ Error Tcp::Endpoint::Initialize(Instance &aInstance, const otTcpEndpointInitiali
     Error         error;
     struct tcpcb &tp = GetTcb();
 
-    memset(&tp, 0x00, sizeof(tp));
+    ClearAllBytes(tp);
 
     SuccessOrExit(error = aInstance.Get<Tcp>().mEndpoints.Add(*this));
 
@@ -92,8 +80,8 @@ Error Tcp::Endpoint::Initialize(Instance &aInstance, const otTcpEndpointInitiali
     mReceiveAvailableCallback = aArgs.mReceiveAvailableCallback;
     mDisconnectedCallback     = aArgs.mDisconnectedCallback;
 
-    memset(mTimers, 0x00, sizeof(mTimers));
-    memset(&mSockAddr, 0x00, sizeof(mSockAddr));
+    ClearAllBytes(mTimers);
+    ClearAllBytes(mSockAddr);
     mPendingCallbacks = 0;
 
     /*
@@ -549,7 +537,7 @@ Error Tcp::Listener::Initialize(Instance &aInstance, const otTcpListenerInitiali
     mAcceptReadyCallback = aArgs.mAcceptReadyCallback;
     mAcceptDoneCallback  = aArgs.mAcceptDoneCallback;
 
-    memset(tpl, 0x00, sizeof(struct tcpcb_listen));
+    ClearAllBytes(*tpl);
     tpl->instance = &aInstance;
 
 exit:
@@ -579,7 +567,7 @@ Error Tcp::Listener::StopListening(void)
 {
     struct tcpcb_listen *tpl = &GetTcbListen();
 
-    memset(&tpl->laddr, 0x00, sizeof(tpl->laddr));
+    ClearAllBytes(tpl->laddr);
     tpl->lport   = 0;
     tpl->t_state = TCP6S_CLOSED;
     return kErrorNone;
@@ -670,7 +658,7 @@ Error Tcp::HandleMessage(ot::Ip6::Header &aIp6Header, Message &aMessage, Message
         otLinkedBuffer *priorHead    = lbuf_head(&tp->sendbuf);
         size_t          priorBacklog = endpoint->GetSendBufferBytes() - endpoint->GetInFlightBytes();
 
-        memset(&sig, 0x00, sizeof(sig));
+        ClearAllBytes(sig);
         nextAction = tcp_input(ip6Header, tcpHeader, &aMessage, tp, nullptr, &sig);
         if (nextAction != RELOOKUP_REQUIRED)
         {
@@ -685,7 +673,7 @@ Error Tcp::HandleMessage(ot::Ip6::Header &aIp6Header, Message &aMessage, Message
     {
         struct tcpcb_listen *tpl = &listener->GetTcbListen();
 
-        memset(&sig, 0x00, sizeof(sig));
+        ClearAllBytes(sig);
         nextAction = tcp_input(ip6Header, tcpHeader, &aMessage, nullptr, tpl, &sig);
         OT_ASSERT(nextAction != RELOOKUP_REQUIRED);
         if (sig.accepted_connection != nullptr)

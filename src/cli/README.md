@@ -40,6 +40,7 @@ Done
 - [counters](#counters)
 - [csl](#csl)
 - [dataset](README_DATASET.md)
+- [debug](#debug)
 - [delaytimermin](#delaytimermin)
 - [detach](#detach)
 - [deviceprops](#deviceprops)
@@ -65,13 +66,13 @@ Done
 - [keysequence](#keysequence-counter)
 - [leaderdata](#leaderdata)
 - [leaderweight](#leaderweight)
-- [linkmetrics](#linkmetrics-mgmt-ipaddr-enhanced-ack-clear)
+- [linkmetrics](#linkmetrics-config-async-ipaddr-enhanced-ack-clear)
 - [linkmetricsmgr](#linkmetricsmgr-disable)
 - [locate](#locate)
 - [log](#log-filename-filename)
 - [mac](#mac-retries-direct)
 - [macfilter](#macfilter)
-- [meshdiag](#meshdiag-topology)
+- [meshdiag](#meshdiag-topology-ip6-addrs-children)
 - [mliid](#mliid-iid)
 - [mlr](#mlr-reg-ipaddr--timeout)
 - [mode](#mode)
@@ -85,6 +86,7 @@ Done
 - [networkkey](#networkkey)
 - [networkname](#networkname)
 - [networktime](#networktime)
+- [nexthop](#nexthop)
 - [panid](#panid)
 - [parent](#parent)
 - [parentpriority](#parentpriority)
@@ -117,7 +119,9 @@ Done
 - [sntp](#sntp-query-sntp-server-ip-sntp-server-port)
 - [state](#state)
 - [srp](README_SRP.md)
+- [tcat](README_TCAT.md)
 - [tcp](README_TCP.md)
+- [test](#test-tmforiginfilter-enabledisable)
 - [thread](#thread-start)
 - [timeinqueue](#timeinqueue)
 - [trel](#trel)
@@ -127,6 +131,7 @@ Done
 - [unsecureport](#unsecureport-add-port)
 - [uptime](#uptime)
 - [vendor](#vendor-name)
+- [verhoeff](#verhoeff-calculate)
 - [version](#version)
 
 ## OpenThread Command Details
@@ -355,9 +360,123 @@ Done
 
 Print border agent state.
 
+Possible states are
+
+- `Stopped` : Border Agent is stopped.
+- `Started` : Border Agent is running with no active connection with external commissioner.
+- `Active` : Border Agent is running and is connected with an external commissioner.
+
 ```bash
 > ba state
 Started
+Done
+```
+
+### ba ephemeralkey
+
+Indicates if an ephemeral key is active.
+
+Requires `OPENTHREAD_CONFIG_BORDER_AGENT_EPHEMERAL_KEY_ENABLE`.
+
+```bash
+> ba ephemeralkey
+inactive
+Done
+
+> ba ephemeralkey set Z10X20g3J15w1000P60m16 1000
+Done
+
+> ba ephemeralkey
+active
+Done
+```
+
+### ba ephemeralkey set \<keystring\> \[timeout\] \[port\]
+
+Sets the ephemeral key for a given timeout duration.
+
+Requires `OPENTHREAD_CONFIG_BORDER_AGENT_EPHEMERAL_KEY_ENABLE`.
+
+The ephemeral key can be set when Border Agent is already running and is not currently connected to any external commissioner (i.e., `ba state` gives `Started`).
+
+The `keystring` string is directly used as the ephemeral PSK (excluding the trailing null `\0` character). Its length MUST be between 6 and 32, inclusive.
+
+The `timeout` is in milliseconds. If not provided or set to zero, the default value of 2 minutes will be used. If the timeout value is larger than 10 minutes, the 10 minutes timeout value will be used instead.
+
+The `port` specifies the UDP port to use with the ephemeral key. If UDP port is zero or is not provided, an ephemeral port will be used. `ba port` will give the current UDP port in use by the Border Agent.
+
+Setting the ephemeral key again before a previously set one is timed out, will replace the previous one.
+
+During the timeout interval, the ephemeral key can be used only once by an external commissioner to establish a connection. After the commissioner disconnects, the ephemeral key is cleared, and the Border Agent reverts to using PSKc. If the timeout expires while a commissioner is still connected, the session will be terminated, and the Border Agent will cease using the ephemeral key and revert to PSKc.
+
+```bash
+> ba ephemeralkey set Z10X20g3J15w1000P60m16 5000 1234
+Done
+```
+
+### ba ephemeralkey clear
+
+Cancels the ephemeral key in use if any.
+
+Requires `OPENTHREAD_CONFIG_BORDER_AGENT_EPHEMERAL_KEY_ENABLE`.
+
+Can be used to cancel a previously set ephemeral key before it is used or times out. If the Border Agent is not running or there is no ephemeral key in use, calling this function has no effect.
+
+If a commissioner is connected using the ephemeral key and is currently active, calling this method does not change its state. In this case the `ba ephemeralkey` will continue to return `active` until the commissioner disconnects.
+
+```bash
+> ba ephemeralkey clear
+Done
+```
+
+### ba ephemeralkey callback enable
+
+Enables callback from Border Agent for ephemeral key state changes.
+
+```bash
+> ba ephemeralkey callback enable
+Done
+
+> ba ephemeralkey set W10X12 5000 49155
+Done
+
+BorderAgent callback: Ephemeral key active, port:49155
+BorderAgent callback: Ephemeral key inactive
+```
+
+### ba ephemeralkey callback disable
+
+Disables callback from Border Agent for ephemeral key state changes.
+
+```bash
+> ba ephemeralkey callback disable
+Done
+```
+
+### ba counters
+
+Get the border agent counter values.
+
+Note that it requires `OPENTHREAD_CONFIG_BORDER_AGENT_EPHEMERAL_KEY_ENABLE` to output the ePSKc counters.
+
+```bash
+> ba counters
+epskcActivation: 2
+epskcApiDeactivation: 1
+epskcTimeoutDeactivation: 1
+epskcMaxAttemptDeactivation: 0
+epskcDisconnectDeactivation: 0
+epskcInvalidBaStateError: 1
+epskcInvalidArgsError: 1
+epskcStartSecureSessionError: 0
+epskcSecureSessionSuccess: 0
+epskcSecureSessionFailure: 0
+epskcCommissionerPetition: 0
+pskcSecureSessionSuccess: 0
+pskcSecureSessionFailure: 0
+pskcCommissionerPetition: 0
+mgmtActiveGet: 0
+mgmtPendingGet: 0
 Done
 ```
 
@@ -1024,29 +1143,51 @@ Set the CSL timeout in seconds.
 Done
 ```
 
-### networktime
+### debug
 
-Get the Thread network time and the time sync parameters.
+Executes a series of CLI commands to gather information about the device and thread network. This is intended for debugging.
 
-```bash
-> networktime
-Network Time:     21084154us (synchronized)
-Time Sync Period: 100s
-XTAL Threshold:   300ppm
-Done
-```
+The output will display each executed CLI command preceded by "\$", followed by the corresponding command's generated output.
 
-### networktime \<timesyncperiod\> \<xtalthreshold\>
+The generated output encompasses the following information:
 
-Set time sync parameters
+- Version
+- Current state
+- RLOC16, extended MAC address
+- Unicast and multicast IPv6 address list
+- Channel
+- PAN ID and extended PAN ID
+- Network Data
+- Partition ID
+- Leader Data
 
-- timesyncperiod: The time synchronization period, in seconds.
-- xtalthreshold: The XTAL accuracy threshold for a device to become Router-Capable device, in PPM.
+If the device is operating as FTD:
 
-```bash
-> networktime 100 300
-Done
-```
+- Child and neighbor table
+- Router table and next hop Info
+- Address cache table
+- Registered MTD child IPv6 address
+- Device properties
+
+If the device supports and acts as an SRP client:
+
+- SRP client state
+- SRP client services and host info
+
+If the device supports and acts as an SRP sever:
+
+- SRP server state and address mode
+- SRP server registered hosts and services
+
+If the device supports TREL:
+
+- TREL status and peer table
+
+If the device supports and acts as a border router:
+
+- BR state
+- BR prefixes (OMR, on-link, NAT64)
+- Discovered prefix table
 
 ### delaytimermin
 
@@ -1170,7 +1311,7 @@ Done
 >
 ```
 
-### dns config \[DNS server IP\] \[DNS server port\] \[response timeout (ms)\] \[max tx attempts\] \[recursion desired (boolean)\] \[service mode]
+### dns config \[DNS server IP\] \[DNS server port\] \[response timeout (ms)\] \[max tx attempts\] \[recursion desired (boolean)\] \[service mode] \[protocol]
 
 Set the default query config.
 
@@ -1208,9 +1349,28 @@ Done
 
 > dns config
 Server: [fd00:0:0:0:0:0:0:2]:53
-ResponseTimeout: 3000 ms
+ResponseTimeout: 6000 ms
 MaxTxAttempts: 3
 RecursionDesired: yes
+Nat64Mode: allow
+TransportProtocol: udp
+Done
+```
+
+This final example shows how only 'recursion desired' and the service mode are set, and all other parameters are set to their defaults:
+
+```bash
+> dns config :: 0 0 0 1 srv_txt_sep
+Done
+
+> dns config
+Server: [2001:4860:4860:0:0:0:0:8888]:53
+ResponseTimeout: 6000 ms
+MaxTxAttempts: 3
+RecursionDesired: yes
+ServiceMode: srv_txt_sep
+Nat64Mode: allow
+TransportProtocol: udp
 Done
 ```
 
@@ -1312,6 +1472,27 @@ Send a service instance resolution DNS query for a given service instance with a
 Service instance label is provided first, followed by the service name (note that service instance label can contain dot '.' character).
 
 The parameters after `service-name` are optional. Any unspecified (or zero) value for these optional parameters is replaced by the value from the current default config (`dns config`).
+
+### dns server upstream \[enable|disable\]
+
+Enable/Disable the upstream DNS feature. If no argument is provided, it prints whether the upstream DNS feature is enabled.
+
+`OPENTHREAD_CONFIG_DNS_UPSTREAM_QUERY_ENABLE` is required.
+
+Enable the upstream DNS feature.
+
+```
+> dns server upstream enable
+Done
+```
+
+Get whether the upstream DNS feature is enabled.
+
+```
+> dns server upstream
+Enabled
+Done
+```
 
 ### dns compression \[enable|disable\]
 
@@ -1653,34 +1834,6 @@ ff32:40:fdde:ad00:beef:0:0:1
 Done
 ```
 
-### ipmaddr promiscuous
-
-Get multicast promiscuous mode.
-
-```bash
-> ipmaddr promiscuous
-Disabled
-Done
-```
-
-### ipmaddr promiscuous enable
-
-Enable multicast promiscuous mode.
-
-```bash
-> ipmaddr promiscuous enable
-Done
-```
-
-### ipmaddr promiscuous disable
-
-Disable multicast promiscuous mode.
-
-```bash
-> ipmaddr promiscuous disable
-Done
-```
-
 ### ipmaddr rlatn
 
 Get the Realm-Local All Thread Nodes multicast address.
@@ -1714,6 +1867,8 @@ Done
 
 Set the Thread Key Sequence Counter.
 
+This command is reserved for testing and demo purposes only. Changing Key Sequence Counter will render a production application non-compliant with the Thread Specification.
+
 ```bash
 > keysequence counter 10
 Done
@@ -1731,7 +1886,9 @@ Done
 
 ### keysequence guardtime \<guardtime\>
 
-Set Thread Key Switch Guard Time (in hours) 0 means Thread Key Switch immediately if key index match
+Set Thread Key Switch Guard Time (in hours).
+
+This command is reserved for testing and demo purposes only. Changing Key Switch Guard Time will render a production application non-compliant with the Thread Specification.
 
 ```bash
 > keysequence guardtime 0
@@ -1771,23 +1928,30 @@ Set the Thread Leader Weight.
 Done
 ```
 
-### linkmetrics mgmt \<ipaddr\> enhanced-ack clear
+### linkmetrics config \[async\] \<ipaddr\> enhanced-ack clear
 
 Send a Link Metrics Management Request to clear an Enhanced-ACK Based Probing.
 
+- async: Use the non-blocking mode.
 - ipaddr: Peer address (SHOULD be link local address of the neighboring device).
 
 ```bash
-> linkmetrics mgmt fe80:0:0:0:3092:f334:1455:1ad2 enhanced-ack clear
+> linkmetrics config fe80:0:0:0:3092:f334:1455:1ad2 enhanced-ack clear
+Received Link Metrics Management Response from: fe80:0:0:0:3092:f334:1455:1ad2
+Status: Success
+Done
+
+> linkmetrics config async fe80:0:0:0:3092:f334:1455:1ad2 enhanced-ack clear
 Done
 > Received Link Metrics Management Response from: fe80:0:0:0:3092:f334:1455:1ad2
 Status: Success
 ```
 
-### linkmetrics mgmt \<ipaddr\> enhanced-ack register [qmr][r]
+### linkmetrics config \[async\] \<ipaddr\> enhanced-ack register \<qmr\> \[r\]
 
 Send a Link Metrics Management Request to register an Enhanced-ACK Based Probing.
 
+- async: Use the non-blocking mode.
 - ipaddr: Peer address.
 - qmr: This specifies what metrics to query. At most two options are allowed to select (per spec 4.11.3.4.4.6).
   - q: Layer 2 LQI.
@@ -1796,21 +1960,27 @@ Send a Link Metrics Management Request to register an Enhanced-ACK Based Probing
 - r: This is optional and only used for reference devices. When this option is specified, Type/Average Enum of each Type Id Flags would be set to `reserved`. This is used to verify the Probing Subject correctly handles invalid Type Id Flags. This is only available when `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE` is enabled.
 
 ```bash
-> linkmetrics mgmt fe80:0:0:0:3092:f334:1455:1ad2 enhanced-ack register qm
+> linkmetrics config fe80:0:0:0:3092:f334:1455:1ad2 enhanced-ack register qm
+Received Link Metrics Management Response from: fe80:0:0:0:3092:f334:1455:1ad2
+Status: Success
+Done
+
+> linkmetrics config async fe80:0:0:0:3092:f334:1455:1ad2 enhanced-ack register qm
 Done
 > Received Link Metrics Management Response from: fe80:0:0:0:3092:f334:1455:1ad2
 Status: Success
 
-> linkmetrics mgmt fe80:0:0:0:3092:f334:1455:1ad2 enhanced-ack register qm r
+> linkmetrics config async fe80:0:0:0:3092:f334:1455:1ad2 enhanced-ack register qm r
 Done
 > Received Link Metrics Management Response from: fe80:0:0:0:3092:f334:1455:1ad2
 Status: Cannot support new series
 ```
 
-### linkmetrics mgmt \<ipaddr\> forward \<seriesid\> [ldraX][pqmr]
+### linkmetrics config \[async\] \<ipaddr\> forward \<seriesid\> \<ldraX\> \<pqmr\>
 
 Send a Link Metrics Management Request to configure a Forward Tracking Series.
 
+- async: Use the non-blocking mode.
 - ipaddr: Peer address.
 - seriesid: The Series ID.
 - ldraX: This specifies which frames are to be accounted.
@@ -1826,7 +1996,12 @@ Send a Link Metrics Management Request to configure a Forward Tracking Series.
   - r: RSSI.
 
 ```bash
-> linkmetrics mgmt fe80:0:0:0:3092:f334:1455:1ad2 forward 1 dra pqmr
+> linkmetrics config fe80:0:0:0:3092:f334:1455:1ad2 forward 1 dra pqmr
+Received Link Metrics Management Response from: fe80:0:0:0:3092:f334:1455:1ad2
+Status: SUCCESS
+Done
+
+> linkmetrics config async fe80:0:0:0:3092:f334:1455:1ad2 forward 1 dra pqmr
 Done
 > Received Link Metrics Management Response from: fe80:0:0:0:3092:f334:1455:1ad2
 Status: SUCCESS
@@ -1845,19 +2020,28 @@ Send a MLE Link Probe message to the peer.
 Done
 ```
 
-### linkmetrics query \<ipaddr\> single [pqmr]
+### linkmetrics request \[async\] \<ipaddr\> single \<pqmr\>
 
 Perform a Link Metrics query (Single Probe).
 
+- async: Use the non-blocking mode.
 - ipaddr: Peer address.
 - pqmr: This specifies what metrics to query.
-- p: Layer 2 Number of PDUs received.
-- q: Layer 2 LQI.
-- m: Link Margin.
-- r: RSSI.
+  - p: Layer 2 Number of PDUs received.
+  - q: Layer 2 LQI.
+  - m: Link Margin.
+  - r: RSSI.
 
 ```bash
-> linkmetrics query fe80:0:0:0:3092:f334:1455:1ad2 single qmr
+> linkmetrics request fe80:0:0:0:3092:f334:1455:1ad2 single qmr
+Received Link Metrics Report from: fe80:0:0:0:3092:f334:1455:1ad2
+
+ - LQI: 76 (Exponential Moving Average)
+ - Margin: 82 (dB) (Exponential Moving Average)
+ - RSSI: -18 (dBm) (Exponential Moving Average)
+Done
+
+> linkmetrics request async fe80:0:0:0:3092:f334:1455:1ad2 single qmr
 Done
 > Received Link Metrics Report from: fe80:0:0:0:3092:f334:1455:1ad2
 
@@ -1866,15 +2050,25 @@ Done
  - RSSI: -18 (dBm) (Exponential Moving Average)
 ```
 
-### linkmetrics query \<ipaddr\> forward \<seriesid\>
+### linkmetrics request \[async\] \<ipaddr\> forward \<seriesid\>
 
 Perform a Link Metrics query (Forward Tracking Series).
 
+- sync: Use the blocking mode.
 - ipaddr: Peer address.
 - seriesid: The Series ID.
 
 ```bash
-> linkmetrics query fe80:0:0:0:3092:f334:1455:1ad2 forward 1
+> linkmetrics request fe80:0:0:0:3092:f334:1455:1ad2 forward 1
+Received Link Metrics Report from: fe80:0:0:0:3092:f334:1455:1ad2
+
+ - PDU Counter: 2 (Count/Summation)
+ - LQI: 76 (Exponential Moving Average)
+ - Margin: 82 (dB) (Exponential Moving Average)
+ - RSSI: -18 (dBm) (Exponential Moving Average)
+Done
+
+> linkmetrics request async fe80:0:0:0:3092:f334:1455:1ad2 forward 1
 Done
 > Received Link Metrics Report from: fe80:0:0:0:3092:f334:1455:1ad2
 
@@ -1999,7 +2193,7 @@ Set the log level.
 Done
 ```
 
-### meshdiag topology [ip6-addrs][children]
+### meshdiag topology \[ip6-addrs\] \[children\]
 
 Discover network topology (list of routers and their connections).
 
@@ -2645,6 +2839,61 @@ Set the Thread Network Name.
 
 ```bash
 > networkname OpenThread
+Done
+```
+
+### networktime
+
+Get the Thread network time and the time sync parameters.
+
+```bash
+> networktime
+Network Time:     21084154us (synchronized)
+Time Sync Period: 100s
+XTAL Threshold:   300ppm
+Done
+```
+
+### networktime \<timesyncperiod\> \<xtalthreshold\>
+
+Set time sync parameters
+
+- timesyncperiod: The time synchronization period, in seconds.
+- xtalthreshold: The XTAL accuracy threshold for a device to become Router-Capable device, in PPM.
+
+```bash
+> networktime 100 300
+Done
+```
+
+### nexthop
+
+Output the table of allocated Router IDs and the current next hop (as Router ID) and path cost for each ID.
+
+```bash
+> nexthop
+| ID   |NxtHop| Cost |
++------+------+------+
+|    9 |    9 |    1 |
+|   25 |   25 |    0 |
+|   30 |   30 |    1 |
+|   46 |    - |    - |
+|   50 |   30 |    3 |
+|   60 |   30 |    2 |
+Done
+```
+
+### nexthop \<rloc16\>
+
+Get the next hop (as RLOC16) and path cost towards a given RLOC16 destination.
+
+```bash
+> nexthop 0xc000
+0xc000 cost:0
+Done
+
+nexthop 0x8001
+0x2000 cost:3
 Done
 ```
 
@@ -3360,13 +3609,13 @@ Done
 
 Module for controlling service registration in Network Data. Each change in service registration must be sent to leader by `netdata register` command before taking effect.
 
-### service add \<enterpriseNumber\> \<serviceData\> \<serverData\>
+### service add \<enterpriseNumber\> \<serviceData\> [\<serverData\>]
 
 Add service to the Network Data.
 
 - enterpriseNumber: IANA enterprise number
 - serviceData: hex-encoded binary service data
-- serverData: hex-encoded binary server data
+- serverData: hex-encoded binary server data (empty if not provided)
 
 ```bash
 > service add 44970 112233 aabbcc
@@ -3428,13 +3677,78 @@ offline, disabled, detached, child, router or leader
 Done
 ```
 
-### state <state>
+### state leader
 
-Try to switch to state `detached`, `child`, `router` or `leader`.
+Become a leader and start a new partition
+
+If the device is not attached, this command will force the device to start as the leader of the network. This use case is only intended for testing and demo purposes, and using the API while the device is detached can make a production application non-compliant with the Thread Specification.
+
+If the device is already attached, this API can be used to try to take over as the leader, creating a new partition. For this to work, the local leader weight (`leaderweight`) must be larger than the weight of the current leader (from `leaderdata`). If it is not, error `NotCapable` is outputted to indicate to the caller that they need to adjust the weight.
+
+Taking over the leader role in this way is only allowed when triggered by an explicit user action. Using this API without such user action can make a production application non-compliant with the Thread Specification.
 
 ```bash
+> leaderdata
+Partition ID: 1886755069
+Weighting: 65
+Data Version: 178
+Stable Data Version: 48
+Leader Router ID: 59
+Done
+
+> leaderweight
+64
+Done
+
+> state leader
+Error 27: NotCapable
+
+> leaderweight 66
+Done
+
 > state leader
 Done
+```
+
+### state <state>
+
+Try to switch to state `detached`, `child`, `router`.
+
+```bash
+> state detached
+Done
+```
+
+### test tmforiginfilter \[enable|disable\]
+
+Enable/disable filter that drops UDP messages sent to the TMF port from untrusted origin. Also get the current state of the filter if no argument is specified.
+
+Note: This filter is enabled by default.
+
+This command is intended for testing only. `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE` is required for all `test` sub-commands.
+
+Get the current state of the filter.
+
+```
+> test tmforiginfilter
+Enabled
+```
+
+Enable or disable the filter.
+
+```
+> test tmforiginfilter enable
+Done
+>
+> test tmforiginfilter
+Enabled
+>
+> test tmforiginfilter disable
+Done
+>
+> test tmforiginfilter
+Disabled
+>
 ```
 
 ### thread start
@@ -3634,6 +3948,16 @@ Done
 Done
 ```
 
+### trel port
+
+Get the TREL UDP port number.
+
+```bash
+> trel port
+49154
+Done
+```
+
 ### tvcheck enable
 
 Enable thread version check when upgrading to router or leader.
@@ -3649,7 +3973,7 @@ Done
 
 ### tvcheck disable
 
-Enable thread version check when upgrading to router or leader.
+Disable thread version check when upgrading to router or leader.
 
 Note: Thread version check is enabled by default.
 
@@ -3791,6 +4115,35 @@ Set the vendor SW version (requires `OPENTHREAD_CONFIG_NET_DIAG_VENDOR_INFO_SET_
 ```bash
 > vendor swversion Marble3.5.1
 Done
+```
+
+### verhoeff calculate
+
+Calculates the Verhoeff checksum for a given decimal string.
+
+Requires `OPENTHREAD_CONFIG_VERHOEFF_CHECKSUM_ENABLE`.
+
+The input string MUST consist of characters in `['0'-'9']`.
+
+```bash
+> verhoeff calculate 30731842
+1
+Done
+```
+
+### verhoeff validate
+
+Validates the Verhoeff checksum for a given decimal string.
+
+Requires `OPENTHREAD_CONFIG_VERHOEFF_CHECKSUM_ENABLE`.
+
+The input string MUST consist of characters in `['0'-'9']`. The last digit is treated as checksum.
+
+```bash
+> verhoeff validate 307318421
+Done
+> verhoeff validate 307318425
+Error 1: Failed
 ```
 
 ### version

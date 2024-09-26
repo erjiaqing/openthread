@@ -32,6 +32,8 @@
 
 #include <openthread/logging.h>
 #include <openthread/message.h>
+#include <openthread/nat64.h>
+#include <openthread/openthread-system.h>
 #include <openthread/udp.h>
 #include <openthread/platform/dns.h>
 #include <openthread/platform/time.h>
@@ -56,10 +58,12 @@ constexpr char kResolvConfFullPath[] = "/etc/resolv.conf";
 constexpr char kNameserverItem[]     = "nameserver";
 } // namespace
 
-extern ot::Posix::Resolver gResolver;
+ot::Posix::Resolver gResolver;
 
 namespace ot {
 namespace Posix {
+
+const char Resolver::kLogModuleName[] = "Resolver";
 
 void Resolver::Init(void)
 {
@@ -83,6 +87,8 @@ void Resolver::LoadDnsServerListFromConf(void)
     std::string   line;
     std::ifstream fp;
 
+    VerifyOrExit(mIsResolvConfEnabled);
+
     mUpstreamDnsServerCount = 0;
 
     fp.open(kResolvConfFullPath);
@@ -95,8 +101,7 @@ void Resolver::LoadDnsServerListFromConf(void)
 
             if (inet_pton(AF_INET, &line.c_str()[sizeof(kNameserverItem)], &addr) == 1)
             {
-                otLogInfoPlat("Got nameserver #%d: %s", mUpstreamDnsServerCount,
-                              &line.c_str()[sizeof(kNameserverItem)]);
+                LogInfo("Got nameserver #%d: %s", mUpstreamDnsServerCount, &line.c_str()[sizeof(kNameserverItem)]);
                 mUpstreamDnsServerList[mUpstreamDnsServerCount] = addr;
                 mUpstreamDnsServerCount++;
             }
@@ -105,10 +110,12 @@ void Resolver::LoadDnsServerListFromConf(void)
 
     if (mUpstreamDnsServerCount == 0)
     {
-        otLogCritPlat("No domain name servers found in %s, default to 127.0.0.1", kResolvConfFullPath);
+        LogCrit("No domain name servers found in %s, default to 127.0.0.1", kResolvConfFullPath);
     }
 
     mUpstreamDnsServerListFreshness = otPlatTimeGet();
+exit:
+    return;
 }
 
 void Resolver::Query(otPlatDnsUpstreamQuery *aTxn, const otMessage *aQuery)
@@ -137,12 +144,12 @@ void Resolver::Query(otPlatDnsUpstreamQuery *aTxn, const otMessage *aQuery)
             sendto(txn->mUdpFd, packet, length, MSG_DONTWAIT, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) > 0,
             error = OT_ERROR_NO_ROUTE);
     }
-    otLogInfoPlat("Forwarded DNS query %p to %d server(s).", static_cast<void *>(aTxn), mUpstreamDnsServerCount);
+    LogInfo("Forwarded DNS query %p to %d server(s).", static_cast<void *>(aTxn), mUpstreamDnsServerCount);
 
 exit:
     if (error != OT_ERROR_NONE)
     {
-        otLogCritPlat("Failed to forward DNS query %p to server: %d", static_cast<void *>(aTxn), error);
+        LogCrit("Failed to forward DNS query %p to server: %d", static_cast<void *>(aTxn), error);
     }
     return;
 }
@@ -171,7 +178,7 @@ Resolver::Transaction *Resolver::AllocateTransaction(otPlatDnsUpstreamQuery *aTh
             fdOrError = socket(AF_INET, SOCK_DGRAM, 0);
             if (fdOrError < 0)
             {
-                otLogInfoPlat("Failed to create socket for upstream resolver: %d", fdOrError);
+                LogInfo("Failed to create socket for upstream resolver: %d", fdOrError);
                 break;
             }
             ret             = &txn;
@@ -203,11 +210,11 @@ void Resolver::ForwardResponse(Transaction *aTxn)
 exit:
     if (readSize < 0)
     {
-        otLogInfoPlat("Failed to read response from upstream resolver socket: %d", errno);
+        LogInfo("Failed to read response from upstream resolver socket: %d", errno);
     }
     if (error != OT_ERROR_NONE)
     {
-        otLogInfoPlat("Failed to forward upstream DNS response: %s", otThreadErrorToString(error));
+        LogInfo("Failed to forward upstream DNS response: %s", otThreadErrorToString(error));
     }
     if (message != nullptr)
     {
@@ -289,8 +296,31 @@ void Resolver::Process(const otSysMainloopContext &aContext)
     }
 }
 
+void Resolver::SetUpstreamDnsServers(const otIp6Address *aUpstreamDnsServers, int aNumServers)
+{
+    mUpstreamDnsServerCount = 0;
+
+    for (int i = 0; i < aNumServers && i < kMaxUpstreamServerCount; ++i)
+    {
+        otIp4Address ip4Address;
+
+        // TODO: support DNS servers with IPv6 addresses
+        if (otIp4FromIp4MappedIp6Address(&aUpstreamDnsServers[i], &ip4Address) == OT_ERROR_NONE)
+        {
+            mUpstreamDnsServerList[mUpstreamDnsServerCount] = ip4Address.mFields.m32;
+            mUpstreamDnsServerCount++;
+        }
+    }
+}
+
 } // namespace Posix
 } // namespace ot
+
+void platformResolverProcess(const otSysMainloopContext *aContext) { gResolver.Process(*aContext); }
+
+void platformResolverUpdateFdSet(otSysMainloopContext *aContext) { gResolver.UpdateFdSet(*aContext); }
+
+void platformResolverInit(void) { gResolver.Init(); }
 
 void otPlatDnsStartUpstreamQuery(otInstance *aInstance, otPlatDnsUpstreamQuery *aTxn, const otMessage *aQuery)
 {
@@ -304,6 +334,13 @@ void otPlatDnsCancelUpstreamQuery(otInstance *aInstance, otPlatDnsUpstreamQuery 
     OT_UNUSED_VARIABLE(aInstance);
 
     gResolver.Cancel(aTxn);
+}
+
+void otSysUpstreamDnsServerSetResolvConfEnabled(bool aEnabled) { gResolver.SetResolvConfEnabled(aEnabled); }
+
+void otSysUpstreamDnsSetServerList(const otIp6Address *aUpstreamDnsServers, int aNumServers)
+{
+    gResolver.SetUpstreamDnsServers(aUpstreamDnsServers, aNumServers);
 }
 
 #endif // OPENTHREAD_CONFIG_DNS_UPSTREAM_QUERY_ENABLE

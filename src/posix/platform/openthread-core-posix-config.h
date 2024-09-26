@@ -34,6 +34,8 @@
 #ifndef OPENTHREAD_CORE_POSIX_CONFIG_H_
 #define OPENTHREAD_CORE_POSIX_CONFIG_H_
 
+#include "openthread-posix-daemon-config.h"
+
 #ifndef OPENTHREAD_CONFIG_NUM_MESSAGE_BUFFERS
 #define OPENTHREAD_CONFIG_NUM_MESSAGE_BUFFERS 256
 #endif
@@ -135,7 +137,7 @@
 #endif
 
 #ifndef OPENTHREAD_CONFIG_UPTIME_ENABLE
-#define OPENTHREAD_CONFIG_UPTIME_ENABLE 1
+#define OPENTHREAD_CONFIG_UPTIME_ENABLE !OPENTHREAD_CONFIG_MULTIPLE_INSTANCE_ENABLE
 #endif
 
 #ifndef OPENTHREAD_CONFIG_LOG_PREPEND_UPTIME
@@ -154,4 +156,11 @@
 #define OPENTHREAD_CONFIG_PLATFORM_POWER_CALIBRATION_ENABLE 1
 #endif
 
+#ifndef OPENTHREAD_CONFIG_MAX_STATECHANGE_HANDLERS
+/**
+ * The `system.cpp` has registered a state-changed callback handler. Another state-changed callback handler
+ * is reserved for application use.
+ */
+#define OPENTHREAD_CONFIG_MAX_STATECHANGE_HANDLERS 2
+#endif
 #endif // OPENTHREAD_CORE_POSIX_CONFIG_H_

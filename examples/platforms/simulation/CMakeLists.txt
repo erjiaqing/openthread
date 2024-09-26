@@ -45,6 +45,13 @@ if(OT_SIMULATION_MAX_NETWORK_SIZE)
     target_compile_definitions(ot-simulation-config INTERFACE "OPENTHREAD_SIMULATION_MAX_NETWORK_SIZE=${OT_SIMULATION_MAX_NETWORK_SIZE}")
 endif()
 
+option(OT_SIMULATION_INFRA_IF "enable simulation infra if" ON)
+if (OT_SIMULATION_INFRA_IF)
+    target_compile_definitions(ot-simulation-config INTERFACE "OPENTHREAD_SIMULATION_IMPLEMENT_INFRA_IF=1")
+else()
+    target_compile_definitions(ot-simulation-config INTERFACE "OPENTHREAD_SIMULATION_IMPLEMENT_INFRA_IF=0")
+endif()
+
 if(NOT OT_PLATFORM_CONFIG)
     set(OT_PLATFORM_CONFIG "openthread-core-simulation-config.h" PARENT_SCOPE)
 endif()
@@ -59,16 +66,21 @@ set(OT_PLATFORM_DEFINES ${OT_PLATFORM_DEFINES} PARENT_SCOPE)
 
 add_library(openthread-simulation
     alarm.c
+    ble.c
     crypto.c
     diag.c
     dns.c
+    dnssd.c
     dso_transport.c
     entropy.c
     flash.c
     infra_if.c
     logging.c
+    mdns_socket.c
     misc.c
+    multipan.c
     radio.c
+    simul_utils.c
     spi-stubs.c
     system.c
     trel.c

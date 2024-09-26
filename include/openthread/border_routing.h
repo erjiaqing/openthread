@@ -69,7 +69,6 @@ extern "C" {
  * self-configure their own routable unicast IPv6 address, this address can be used by Thread devices to reach AIL. If
  * Border Router finds no such RA message on AIL, it generates a ULA on-link prefix which it then advertises on AIL in
  * the emitted RA messages.
- *
  */
 
 /**
@@ -79,25 +78,36 @@ extern "C" {
  * accessed or used by caller.
  *
  * Before using an iterator, it MUST be initialized using `otBorderRoutingPrefixTableInitIterator()`.
- *
  */
 typedef struct otBorderRoutingPrefixTableIterator
 {
     const void *mPtr1;
     const void *mPtr2;
-    uint32_t    mData32;
+    uint32_t    mData0;
+    uint32_t    mData1;
+    uint8_t     mData2;
+    uint8_t     mData3;
 } otBorderRoutingPrefixTableIterator;
 
 /**
  * Represents a discovered router on the infrastructure link.
  *
+ * The `mIsPeerBr` field requires `OPENTHREAD_CONFIG_BORDER_ROUTING_TRACK_PEER_BR_INFO_ENABLE`. Routing Manager
+ * determines whether the router is a peer BR (connected to the same Thread mesh network) by comparing its advertised
+ * PIO/RIO prefixes with the entries in the Thread Network Data. While this method is generally effective, it may not
+ * be 100% accurate in all scenarios, so the `mIsPeerBr` flag should be used with caution.
  */
 typedef struct otBorderRoutingRouterEntry
 {
     otIp6Address mAddress;                      ///< IPv6 address of the router.
+    uint32_t     mMsecSinceLastUpdate;          ///< Milliseconds since last update (any message rx) from this router.
+    uint32_t     mAge;                          ///< The router's age in seconds (duration since its first discovery).
     bool         mManagedAddressConfigFlag : 1; ///< The router's Managed Address Config flag (`M` flag).
     bool         mOtherConfigFlag : 1;          ///< The router's Other Config flag (`O` flag).
-    bool         mStubRouterFlag : 1;           ///< The router's Stub Router flag.
+    bool         mSnacRouterFlag : 1;           ///< The router's SNAC Router flag (`S` flag).
+    bool         mIsLocalDevice : 1;            ///< This router is the local device (this BR).
+    bool         mIsReachable : 1;              ///< This router is reachable.
+    bool         mIsPeerBr : 1;                 ///< This router is (likely) a peer BR.
 } otBorderRoutingRouterEntry;
 
 /**
@@ -105,7 +115,6 @@ typedef struct otBorderRoutingRouterEntry
  *
  * The entries in the discovered table track the Prefix/Route Info Options in the received Router Advertisement messages
  * from other routers on the infrastructure link.
- *
  */
 typedef struct otBorderRoutingPrefixTableEntry
 {
@@ -119,8 +128,26 @@ typedef struct otBorderRoutingPrefixTableEntry
 } otBorderRoutingPrefixTableEntry;
 
 /**
+ * Represents information about a peer Border Router found in the Network Data.
+ */
+typedef struct otBorderRoutingPeerBorderRouterEntry
+{
+    uint16_t mRloc16; ///< The RLOC16 of BR.
+    uint32_t mAge;    ///< Seconds since the BR appeared in the Network Data.
+} otBorderRoutingPeerBorderRouterEntry;
+
+/**
+ * Represents a group of data of platform-generated RA messages processed.
+ */
+typedef struct otPdProcessedRaInfo
+{
+    uint32_t mNumPlatformRaReceived;   ///< The number of platform generated RA handled by ProcessPlatformGeneratedRa.
+    uint32_t mNumPlatformPioProcessed; ///< The number of PIO processed for adding OMR prefixes.
+    uint32_t mLastPlatformRaMsec;      ///< The timestamp of last processed RA message.
+} otPdProcessedRaInfo;
+
+/**
  * Represents the state of Border Routing Manager.
- *
  */
 typedef enum
 {
@@ -132,7 +159,6 @@ typedef enum
 
 /**
  * This enumeration represents the state of DHCPv6 Prefix Delegation State.
- *
  */
 typedef enum
 {
@@ -160,7 +186,6 @@ typedef enum
  *
  * @sa otPlatInfraIfStateChanged.
  * @sa otBorderRoutingSetEnabled.
- *
  */
 otError otBorderRoutingInit(otInstance *aInstance, uint32_t aInfraIfIndex, bool aInfraIfIsRunning);
 
@@ -174,7 +199,6 @@ otError otBorderRoutingInit(otInstance *aInstance, uint32_t aInfraIfIndex, bool 
  *
  * @retval  OT_ERROR_INVALID_STATE  The Border Routing Manager is not initialized yet.
  * @retval  OT_ERROR_NONE           Successfully enabled/disabled the Border Routing Manager.
- *
  */
 otError otBorderRoutingSetEnabled(otInstance *aInstance, bool aEnabled);
 
@@ -184,7 +208,6 @@ otError otBorderRoutingSetEnabled(otInstance *aInstance, bool aEnabled);
  * @param[in]  aInstance  A pointer to an OpenThread instance.
  *
  * @returns The current state of Border Routing Manager.
- *
  */
 otBorderRoutingState otBorderRoutingGetState(otInstance *aInstance);
 
@@ -200,7 +223,6 @@ otBorderRoutingState otBorderRoutingGetState(otInstance *aInstance);
  *   low preference when in child role.
  *
  * @returns The current Route Info Option preference.
- *
  */
 otRoutePreference otBorderRoutingGetRouteInfoOptionPreference(otInstance *aInstance);
 
@@ -213,7 +235,6 @@ otRoutePreference otBorderRoutingGetRouteInfoOptionPreference(otInstance *aInsta
  *
  * @param[in] aInstance     A pointer to an OpenThread instance.
  * @param[in] aPreference   The route preference to use.
- *
  */
 void otBorderRoutingSetRouteInfoOptionPreference(otInstance *aInstance, otRoutePreference aPreference);
 
@@ -224,9 +245,23 @@ void otBorderRoutingSetRouteInfoOptionPreference(otInstance *aInstance, otRouteP
  * in router/leader role and low preference when in child role.
  *
  * @param[in] aInstance     A pointer to an OpenThread instance.
- *
  */
 void otBorderRoutingClearRouteInfoOptionPreference(otInstance *aInstance);
+
+/**
+ * Sets additional options to append at the end of emitted Router Advertisement (RA) messages.
+ *
+ * The content of @p aOptions is copied internally, so it can be a temporary buffer (e.g., a stack allocated array).
+ *
+ * Subsequent calls to this function overwrite the previously set value.
+ *
+ * @param[in] aOptions   A pointer to the encoded options. Can be `NULL` to clear.
+ * @param[in] aLength    Number of bytes in @p aOptions.
+ *
+ * @retval OT_ERROR_NONE     Successfully set the extra option bytes.
+ * @retval OT_ERROR_NO_BUFS  Could not allocate buffer to save the buffer.
+ */
+otError otBorderRoutingSetExtraRouterAdvertOptions(otInstance *aInstance, const uint8_t *aOptions, uint16_t aLength);
 
 /**
  * Gets the current preference used for published routes in Network Data.
@@ -239,7 +274,6 @@ void otBorderRoutingClearRouteInfoOptionPreference(otInstance *aInstance);
  * @param[in] aInstance     A pointer to an OpenThread instance.
  *
  * @returns The current published route preference.
- *
  */
 otRoutePreference otBorderRoutingGetRoutePreference(otInstance *aInstance);
 
@@ -251,7 +285,6 @@ otRoutePreference otBorderRoutingGetRoutePreference(otInstance *aInstance);
  *
  * @param[in] aInstance     A pointer to an OpenThread instance.
  * @param[in] aPreference   The route preference to use.
- *
  */
 void otBorderRoutingSetRoutePreference(otInstance *aInstance, otRoutePreference aPreference);
 
@@ -262,7 +295,6 @@ void otBorderRoutingSetRoutePreference(otInstance *aInstance, otRoutePreference 
  * link quality (to the parent when acting as end-device).
  *
  * @param[in] aInstance     A pointer to an OpenThread instance.
- *
  */
 void otBorderRoutingClearRoutePreference(otInstance *aInstance);
 
@@ -283,7 +315,6 @@ void otBorderRoutingClearRoutePreference(otInstance *aInstance);
  * @retval  OT_ERROR_NONE           Successfully retrieved the OMR prefix.
  *
  * @sa otBorderRoutingGetPdOmrPrefix
- *
  */
 otError otBorderRoutingGetOmrPrefix(otInstance *aInstance, otIp6Prefix *aPrefix);
 
@@ -303,9 +334,22 @@ otError otBorderRoutingGetOmrPrefix(otInstance *aInstance, otIp6Prefix *aPrefix)
  *
  * @sa otBorderRoutingGetOmrPrefix
  * @sa otPlatBorderRoutingProcessIcmp6Ra
- *
  */
 otError otBorderRoutingGetPdOmrPrefix(otInstance *aInstance, otBorderRoutingPrefixTableEntry *aPrefixInfo);
+
+/**
+ * Gets the data of platform generated RA message processed..
+ *
+ * `OPENTHREAD_CONFIG_BORDER_ROUTING_DHCP6_PD_ENABLE` must be enabled.
+ *
+ * @param[in]   aInstance    A pointer to an OpenThread instance.
+ * @param[out]  aPrefixInfo  A pointer to where the prefix info will be output to.
+ *
+ * @retval  OT_ERROR_NONE           Successfully retrieved the Info.
+ * @retval  OT_ERROR_INVALID_STATE  The Border Routing Manager is not initialized yet.
+ * @retval  OT_ERROR_NOT_FOUND      There are no valid Info on this BR.
+ */
+otError otBorderRoutingGetPdProcessedRaInfo(otInstance *aInstance, otPdProcessedRaInfo *aPdProcessedRaInfo);
 
 /**
  * Gets the currently favored Off-Mesh-Routable (OMR) Prefix.
@@ -318,7 +362,6 @@ otError otBorderRoutingGetPdOmrPrefix(otInstance *aInstance, otBorderRoutingPref
  *
  * @retval  OT_ERROR_INVALID_STATE  The Border Routing Manager is not running yet.
  * @retval  OT_ERROR_NONE           Successfully retrieved the favored OMR prefix.
- *
  */
 otError otBorderRoutingGetFavoredOmrPrefix(otInstance *aInstance, otIp6Prefix *aPrefix, otRoutePreference *aPreference);
 
@@ -333,7 +376,6 @@ otError otBorderRoutingGetFavoredOmrPrefix(otInstance *aInstance, otIp6Prefix *a
  *
  * @retval  OT_ERROR_INVALID_STATE  The Border Routing Manager is not initialized yet.
  * @retval  OT_ERROR_NONE           Successfully retrieved the local on-link prefix.
- *
  */
 otError otBorderRoutingGetOnLinkPrefix(otInstance *aInstance, otIp6Prefix *aPrefix);
 
@@ -347,7 +389,6 @@ otError otBorderRoutingGetOnLinkPrefix(otInstance *aInstance, otIp6Prefix *aPref
  *
  * @retval  OT_ERROR_INVALID_STATE  The Border Routing Manager is not initialized yet.
  * @retval  OT_ERROR_NONE           Successfully retrieved the favored on-link prefix.
- *
  */
 otError otBorderRoutingGetFavoredOnLinkPrefix(otInstance *aInstance, otIp6Prefix *aPrefix);
 
@@ -363,7 +404,6 @@ otError otBorderRoutingGetFavoredOnLinkPrefix(otInstance *aInstance, otIp6Prefix
  *
  * @retval  OT_ERROR_INVALID_STATE  The Border Routing Manager is not initialized yet.
  * @retval  OT_ERROR_NONE           Successfully retrieved the NAT64 prefix.
- *
  */
 otError otBorderRoutingGetNat64Prefix(otInstance *aInstance, otIp6Prefix *aPrefix);
 
@@ -378,7 +418,6 @@ otError otBorderRoutingGetNat64Prefix(otInstance *aInstance, otIp6Prefix *aPrefi
  *
  * @retval  OT_ERROR_INVALID_STATE  The Border Routing Manager is not initialized yet.
  * @retval  OT_ERROR_NONE           Successfully retrieved the favored NAT64 prefix.
- *
  */
 otError otBorderRoutingGetFavoredNat64Prefix(otInstance        *aInstance,
                                              otIp6Prefix       *aPrefix,
@@ -396,7 +435,6 @@ otError otBorderRoutingGetFavoredNat64Prefix(otInstance        *aInstance,
  *
  * @param[in]  aInstance  The OpenThread instance.
  * @param[out] aIterator  A pointer to the iterator to initialize.
- *
  */
 void otBorderRoutingPrefixTableInitIterator(otInstance *aInstance, otBorderRoutingPrefixTableIterator *aIterator);
 
@@ -412,7 +450,6 @@ void otBorderRoutingPrefixTableInitIterator(otInstance *aInstance, otBorderRouti
  *
  * @retval OT_ERROR_NONE        Iterated to the next entry, @p aEntry and @p aIterator are updated.
  * @retval OT_ERROR_NOT_FOUND   No more entries in the table.
- *
  */
 otError otBorderRoutingGetNextPrefixTableEntry(otInstance                         *aInstance,
                                                otBorderRoutingPrefixTableIterator *aIterator,
@@ -427,11 +464,60 @@ otError otBorderRoutingGetNextPrefixTableEntry(otInstance                       
  *
  * @retval OT_ERROR_NONE        Iterated to the next router, @p aEntry and @p aIterator are updated.
  * @retval OT_ERROR_NOT_FOUND   No more router entries.
- *
  */
 otError otBorderRoutingGetNextRouterEntry(otInstance                         *aInstance,
                                           otBorderRoutingPrefixTableIterator *aIterator,
                                           otBorderRoutingRouterEntry         *aEntry);
+
+/**
+ * Iterates over the peer BRs found in the Network Data.
+ *
+ * Requires `OPENTHREAD_CONFIG_BORDER_ROUTING_TRACK_PEER_BR_INFO_ENABLE`.
+ *
+ * Peer BRs are other devices within the Thread mesh that provide external IP connectivity. A device is considered
+ * to provide external IP connectivity if at least one of the following conditions is met regarding its Network Data
+ * entries:
+ *
+ * - It has added at least one external route entry.
+ * - It has added at least one prefix entry with both the default-route and on-mesh flags set.
+ * - It has added at least one domain prefix (with both the domain and on-mesh flags set).
+ *
+ * The list of peer BRs specifically excludes the current device, even if it is itself acting as a BR.
+ *
+ * @param[in]     aInstance    The OpenThread instance.
+ * @param[in,out] aIterator    A pointer to the iterator.
+ * @param[out]    aEntry       A pointer to the entry to populate.
+ *
+ * @retval OT_ERROR_NONE        Iterated to the next entry, @p aEntry and @p aIterator are updated.
+ * @retval OT_ERROR_NOT_FOUND   No more entries.
+ */
+otError otBorderRoutingGetNextPeerBrEntry(otInstance                           *aInstance,
+                                          otBorderRoutingPrefixTableIterator   *aIterator,
+                                          otBorderRoutingPeerBorderRouterEntry *aEntry);
+
+/**
+ * Returns the number of peer BRs found in the Network Data.
+ *
+ * Requires `OPENTHREAD_CONFIG_BORDER_ROUTING_TRACK_PEER_BR_INFO_ENABLE`.
+ *
+ * Peer BRs are other devices within the Thread mesh that provide external IP connectivity. A device is considered
+ * to provide external IP connectivity if at least one of the following conditions is met regarding its Network Data
+ * entries:
+ *
+ * - It has added at least one external route entry.
+ * - It has added at least one prefix entry with both the default-route and on-mesh flags set.
+ * - It has added at least one domain prefix (with both the domain and on-mesh flags set).
+ *
+ * The list of peer BRs specifically excludes the current device, even if it is itself acting as a BR.
+ *
+ * @param[in]  aInstance    The OpenThread instance.
+ * @param[out] aMinAge      Pointer to an `uint32_t` to return the minimum age among all peer BRs.
+ *                          Can be NULL if the caller does not need this information.
+ *                          Age is represented as seconds since appearance of the BR entry in the Network Data.
+ *
+ * @returns The number of peer BRs.
+ */
+uint16_t otBorderRoutingCountPeerBrs(otInstance *aInstance, uint32_t *aMinAge);
 
 /**
  * Enables / Disables DHCPv6 Prefix Delegation.
@@ -440,13 +526,55 @@ otError otBorderRoutingGetNextRouterEntry(otInstance                         *aI
  *
  * @param[in] aInstance A pointer to an OpenThread instance.
  * @param[in] aEnabled  Whether to accept platform generated RA messages.
- *
  */
 void otBorderRoutingDhcp6PdSetEnabled(otInstance *aInstance, bool aEnabled);
 
 /**
- * @}
+ * Gets the current state of DHCPv6 Prefix Delegation.
  *
+ * Requires `OPENTHREAD_CONFIG_BORDER_ROUTING_DHCP6_PD_ENABLE` to be enabled.
+ *
+ * @param[in]  aInstance  A pointer to an OpenThread instance.
+ *
+ * @returns The current state of DHCPv6 Prefix Delegation.
+ */
+otBorderRoutingDhcp6PdState otBorderRoutingDhcp6PdGetState(otInstance *aInstance);
+
+/**
+ * When the state of a DHCPv6 Prefix Delegation (PD) on the Thread interface changes, this callback notifies processes
+ * in the OS of this changed state.
+ *
+ * @param[in] aState    The state of DHCPv6 Prefix Delegation State.
+ * @param[in] aContext  A pointer to arbitrary context information.
+ */
+typedef void (*otBorderRoutingRequestDhcp6PdCallback)(otBorderRoutingDhcp6PdState aState, void *aContext);
+
+/**
+ * Sets the callback whenever the DHCPv6 PD state changes on the Thread interface.
+ *
+ * Subsequent calls to this function replace the previously set callback.
+ *
+ * @param[in] aInstance  A pointer to an OpenThread instance.
+ * @param[in] aCallback  A pointer to a function that is called whenever the DHCPv6 PD state changes.
+ * @param[in] aContext   A pointer to arbitrary context information.
+ */
+void otBorderRoutingDhcp6PdSetRequestCallback(otInstance                           *aInstance,
+                                              otBorderRoutingRequestDhcp6PdCallback aCallback,
+                                              void                                 *aContext);
+
+/**
+ * Sets the local on-link prefix.
+ *
+ * Requires `OPENTHREAD_CONFIG_BORDER_ROUTING_TESTING_API_ENABLE`.
+ *
+ * This is intended for testing only and using it will make the BR non-compliant with the Thread Specification.
+ *
+ * @param[in]  aPrefix      The on-link prefix to use.
+ */
+void otBorderRoutingSetOnLinkPrefix(otInstance *aInstance, const otIp6Prefix *aPrefix);
+
+/**
+ * @}
  */
 
 #ifdef __cplusplus

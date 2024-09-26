@@ -28,17 +28,7 @@
 
 #include "coap.hpp"
 
-#include "common/array.hpp"
-#include "common/as_core_type.hpp"
-#include "common/code_utils.hpp"
-#include "common/debug.hpp"
-#include "common/locator_getters.hpp"
-#include "common/log.hpp"
-#include "common/random.hpp"
 #include "instance/instance.hpp"
-#include "net/ip6.hpp"
-#include "net/udp6.hpp"
-#include "thread/thread_netif.hpp"
 
 /**
  * @file
@@ -160,13 +150,13 @@ exit:
     return aMessage;
 }
 
-Message *CoapBase::InitResponse(Message *aMessage, const Message &aResponse)
+Message *CoapBase::InitResponse(Message *aMessage, const Message &aRequest)
 {
     Error error = kErrorNone;
 
     VerifyOrExit(aMessage != nullptr);
 
-    SuccessOrExit(error = aMessage->SetDefaultResponseHeader(aResponse));
+    SuccessOrExit(error = aMessage->SetDefaultResponseHeader(aRequest));
     SuccessOrExit(error = aMessage->SetPayloadMarker());
 
 exit:
@@ -464,8 +454,7 @@ void CoapBase::HandleRetransmissionTimer(Timer &aTimer)
 
 void CoapBase::HandleRetransmissionTimer(void)
 {
-    TimeMilli        now      = TimerMilli::GetNow();
-    TimeMilli        nextTime = now.GetDistantFuture();
+    NextFireTime     nextTime;
     Metadata         metadata;
     Ip6::MessageInfo messageInfo;
 
@@ -473,7 +462,7 @@ void CoapBase::HandleRetransmissionTimer(void)
     {
         metadata.ReadFrom(message);
 
-        if (now >= metadata.mNextTimerShot)
+        if (nextTime.GetNow() >= metadata.mNextTimerShot)
         {
 #if OPENTHREAD_CONFIG_COAP_OBSERVE_API_ENABLE
             if (message.IsRequest() && metadata.mObserve && metadata.mAcknowledged)
@@ -493,7 +482,7 @@ void CoapBase::HandleRetransmissionTimer(void)
             // Increment retransmission counter and timer.
             metadata.mRetransmissionsRemaining--;
             metadata.mRetransmissionTimeout *= 2;
-            metadata.mNextTimerShot = now + metadata.mRetransmissionTimeout;
+            metadata.mNextTimerShot = nextTime.GetNow() + metadata.mRetransmissionTimeout;
             metadata.UpdateIn(message);
 
             // Retransmit
@@ -512,13 +501,10 @@ void CoapBase::HandleRetransmissionTimer(void)
             }
         }
 
-        nextTime = Min(nextTime, metadata.mNextTimerShot);
+        nextTime.UpdateIfEarlier(metadata.mNextTimerShot);
     }
 
-    if (nextTime < now.GetDistantFuture())
-    {
-        mRetransmissionTimer.FireAt(nextTime);
-    }
+    mRetransmissionTimer.FireAt(nextTime);
 }
 
 void CoapBase::FinalizeCoapTransaction(Message                &aRequest,
@@ -619,7 +605,6 @@ Error CoapBase::PrepareNextBlockRequest(Message::BlockType aType,
 {
     Error            error       = kErrorNone;
     bool             isOptionSet = false;
-    uint64_t         optionBuf   = 0;
     uint16_t         blockOption = 0;
     Option::Iterator iterator;
 
@@ -655,8 +640,9 @@ Error CoapBase::PrepareNextBlockRequest(Message::BlockType aType,
         }
 
         // Copy option
-        SuccessOrExit(error = iterator.ReadOptionValue(&optionBuf));
-        SuccessOrExit(error = aRequest.AppendOption(optionNumber, iterator.GetOption()->GetLength(), &optionBuf));
+        SuccessOrExit(error = aRequest.AppendOptionFromMessage(optionNumber, iterator.GetOption()->GetLength(),
+                                                               iterator.GetMessage(),
+                                                               iterator.GetOptionValueMessageOffset()));
     }
 
     if (!isOptionSet)
@@ -1364,7 +1350,7 @@ void CoapBase::ProcessReceivedRequest(Message &aMessage, const Ip6::MessageInfo 
 
     for (const ResourceBlockWise &resource : mBlockWiseResources)
     {
-        if (strcmp(resource.GetUriPath(), uriPath) != 0)
+        if (!StringMatch(resource.GetUriPath(), uriPath))
         {
             continue;
         }
@@ -1431,7 +1417,7 @@ void CoapBase::ProcessReceivedRequest(Message &aMessage, const Ip6::MessageInfo 
 
     for (const Resource &resource : mResources)
     {
-        if (strcmp(resource.mUriPath, uriPath) == 0)
+        if (StringMatch(resource.mUriPath, uriPath))
         {
             resource.HandleRequest(aMessage, aMessageInfo);
             error = kErrorNone;
@@ -1590,8 +1576,7 @@ void ResponsesQueue::HandleTimer(Timer &aTimer)
 
 void ResponsesQueue::HandleTimer(void)
 {
-    TimeMilli now             = TimerMilli::GetNow();
-    TimeMilli nextDequeueTime = now.GetDistantFuture();
+    NextFireTime nextDequeueTime;
 
     for (Message &message : mQueue)
     {
@@ -1599,19 +1584,16 @@ void ResponsesQueue::HandleTimer(void)
 
         metadata.ReadFrom(message);
 
-        if (now >= metadata.mDequeueTime)
+        if (nextDequeueTime.GetNow() >= metadata.mDequeueTime)
         {
             DequeueResponse(message);
             continue;
         }
 
-        nextDequeueTime = Min(nextDequeueTime, metadata.mDequeueTime);
+        nextDequeueTime.UpdateIfEarlier(metadata.mDequeueTime);
     }
 
-    if (nextDequeueTime < now.GetDistantFuture())
-    {
-        mTimer.FireAt(nextDequeueTime);
-    }
+    mTimer.FireAt(nextDequeueTime);
 }
 
 void ResponsesQueue::ResponseMetadata::ReadFrom(const Message &aMessage)
@@ -1701,7 +1683,7 @@ Resource::Resource(Uri aUri, RequestHandler aHandler, void *aContext)
 
 Coap::Coap(Instance &aInstance)
     : CoapBase(aInstance, &Coap::Send)
-    , mSocket(aInstance)
+    , mSocket(aInstance, *this)
 {
 }
 
@@ -1712,7 +1694,7 @@ Error Coap::Start(uint16_t aPort, Ip6::NetifIdentifier aNetifIdentifier)
 
     VerifyOrExit(!mSocket.IsBound());
 
-    SuccessOrExit(error = mSocket.Open(&Coap::HandleUdpReceive, this));
+    SuccessOrExit(error = mSocket.Open());
     socketOpened = true;
 
     SuccessOrExit(error = mSocket.Bind(aPort, aNetifIdentifier));
@@ -1739,9 +1721,9 @@ exit:
     return error;
 }
 
-void Coap::HandleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo)
+void Coap::HandleUdpReceive(ot::Message &aMessage, const Ip6::MessageInfo &aMessageInfo)
 {
-    static_cast<Coap *>(aContext)->Receive(AsCoapMessage(aMessage), AsCoreType(aMessageInfo));
+    Receive(AsCoapMessage(&aMessage), aMessageInfo);
 }
 
 Error Coap::Send(CoapBase &aCoapBase, ot::Message &aMessage, const Ip6::MessageInfo &aMessageInfo)

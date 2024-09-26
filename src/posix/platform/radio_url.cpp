@@ -84,6 +84,7 @@ const char *otSysGetRadioUrlHelpString(void)
     "    uart-stop[=number-of-bits]     Uart stop bit, default is 1.\n"                              \
     "    uart-baudrate[=baudrate]       Uart baud rate, default is 115200.\n"                        \
     "    uart-flow-control              Enable flow control, disabled by default.\n"                 \
+    "    uart-init-deassert             Deassert lines on init when flow control is disabled.\n"     \
     "    uart-reset                     Reset connection after hard resetting RCP(USB CDC ACM).\n"   \
     "\n"
 #else
@@ -120,13 +121,23 @@ const char *otSysGetRadioUrlHelpString(void)
            "                                  Disable coex with 0, and enable it with other values.\n"
            "    fem-lnagain[=dbm]             Set the Rx LNA gain in dBm of the external FEM.\n"
            "    no-reset                      Do not send Spinel reset command to RCP on initialization.\n"
-           "    skip-rcp-compatibility-check  Skip checking RCP API version and capabilities during initialization.\n";
+           "    skip-rcp-compatibility-check  Skip checking RCP API version and capabilities during initialization.\n"
+           "    bus-latency[=usec]            Communication latency in usec, default is 0.\n"
+#if OPENTHREAD_CONFIG_MULTIPAN_RCP_ENABLE
+           "    iid                           Set the Spinel Interface ID for this process. Valid values are 0-3.\n"
+           "    iid-list                      List of IIDs a host can subscribe to receive spinel frames other than \n"
+           "                                  provided in 'iid' argument. If not specified, host will subscribe to \n"
+           "                                  the interface ID provided in 'iid` argument. Valid values are 0-3. \n"
+           "                                  Upto three IIDs can be provided with each IID separated by ',' \n"
+           "                                  e.g. iid-list=1,2,3 \n"
+#endif
+        ;
 }
 
 namespace ot {
 namespace Posix {
 
-RadioUrl::RadioUrl(const char *aUrl)
+void RadioUrl::Init(const char *aUrl)
 {
     if (aUrl != nullptr)
     {

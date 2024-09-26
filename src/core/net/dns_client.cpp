@@ -30,16 +30,7 @@
 
 #if OPENTHREAD_CONFIG_DNS_CLIENT_ENABLE
 
-#include "common/array.hpp"
-#include "common/as_core_type.hpp"
-#include "common/code_utils.hpp"
-#include "common/debug.hpp"
-#include "common/locator_getters.hpp"
-#include "common/log.hpp"
 #include "instance/instance.hpp"
-#include "net/udp6.hpp"
-#include "thread/network_data_types.hpp"
-#include "thread/thread_netif.hpp"
 
 /**
  * @file
@@ -737,7 +728,7 @@ const uint16_t *const Client::kQuestionRecordTypes[] = {
 
 Client::Client(Instance &aInstance)
     : InstanceLocator(aInstance)
-    , mSocket(aInstance)
+    , mSocket(aInstance, *this)
 #if OPENTHREAD_CONFIG_DNS_CLIENT_OVER_TCP_ENABLE
     , mTcpState(kTcpUninitialized)
 #endif
@@ -768,7 +759,7 @@ Error Client::Start(void)
 {
     Error error;
 
-    SuccessOrExit(error = mSocket.Open(&Client::HandleUdpReceive, this));
+    SuccessOrExit(error = mSocket.Open());
     SuccessOrExit(error = mSocket.Bind(0, Ip6::kNetifUnspecified));
 
 exit:
@@ -791,6 +782,8 @@ void Client::Stop(void)
         IgnoreError(mEndpoint.Deinitialize());
     }
 #endif
+
+    mLimitedQueryServers.Clear();
 }
 
 #if OPENTHREAD_CONFIG_DNS_CLIENT_OVER_TCP_ENABLE
@@ -799,7 +792,7 @@ Error Client::InitTcpSocket(void)
     Error                       error;
     otTcpEndpointInitializeArgs endpointArgs;
 
-    memset(&endpointArgs, 0x00, sizeof(endpointArgs));
+    ClearAllBytes(endpointArgs);
     endpointArgs.mSendDoneCallback         = HandleTcpSendDoneCallback;
     endpointArgs.mEstablishedCallback      = HandleTcpEstablishedCallback;
     endpointArgs.mReceiveAvailableCallback = HandleTcpReceiveAvailableCallback;
@@ -937,6 +930,8 @@ Error Client::Resolve(const char        *aInstanceLabel,
 
     info.mConfig.SetFrom(aConfig, mDefaultConfig);
     info.mShouldResolveHostAddr = aShouldResolveHostAddr;
+
+    CheckAndUpdateServiceMode(info.mConfig, aConfig);
 
     switch (info.mConfig.GetServiceMode())
     {
@@ -1301,11 +1296,10 @@ exit:
     return matchedQuery;
 }
 
-void Client::HandleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *aMsgInfo)
+void Client::HandleUdpReceive(Message &aMessage, const Ip6::MessageInfo &aMsgInfo)
 {
     OT_UNUSED_VARIABLE(aMsgInfo);
-
-    static_cast<Client *>(aContext)->ProcessResponse(AsCoreType(aMessage));
+    ProcessResponse(aMessage);
 }
 
 void Client::ProcessResponse(const Message &aResponseMessage)
@@ -1403,6 +1397,11 @@ Error Client::ParseResponse(const Message &aResponseMessage, Query *&aQuery, Err
 
     aResponseError = Header::ResponseCodeToError(header.GetResponseCode());
 
+    if ((aResponseError == kErrorNone) && (info.mQueryType == kServiceQuerySrvTxt))
+    {
+        RecordServerAsCapableOfMultiQuestions(info.mConfig.GetServerSockAddr().GetAddress());
+    }
+
 exit:
     return error;
 }
@@ -1496,9 +1495,8 @@ void Client::PrepareResponseAndFinalize(Query &aQuery, const Message &aResponseM
 
 void Client::HandleTimer(void)
 {
-    TimeMilli now      = TimerMilli::GetNow();
-    TimeMilli nextTime = now.GetDistantFuture();
-    QueryInfo info;
+    NextFireTime nextTime;
+    QueryInfo    info;
 #if OPENTHREAD_CONFIG_DNS_CLIENT_OVER_TCP_ENABLE
     bool hasTcpQuery = false;
 #endif
@@ -1514,7 +1512,7 @@ void Client::HandleTimer(void)
                 continue;
             }
 
-            if (now >= info.mRetransmissionTime)
+            if (nextTime.GetNow() >= info.mRetransmissionTime)
             {
                 if (info.mTransmissionCount >= info.mConfig.GetMaxTxAttempts())
                 {
@@ -1522,13 +1520,20 @@ void Client::HandleTimer(void)
                     break;
                 }
 
-                IgnoreError(SendQuery(*query, info, /* aUpdateTimer */ false));
+#if OPENTHREAD_CONFIG_DNS_CLIENT_SERVICE_DISCOVERY_ENABLE
+                if (ReplaceWithSeparateSrvTxtQueries(*query) == kErrorNone)
+                {
+                    LogInfo("Switching to separate SRV/TXT on response timeout");
+                    info.ReadFrom(*query);
+                }
+                else
+#endif
+                {
+                    IgnoreError(SendQuery(*query, info, /* aUpdateTimer */ false));
+                }
             }
 
-            if (nextTime > info.mRetransmissionTime)
-            {
-                nextTime = info.mRetransmissionTime;
-            }
+            nextTime.UpdateIfEarlier(info.mRetransmissionTime);
 
 #if OPENTHREAD_CONFIG_DNS_CLIENT_OVER_TCP_ENABLE
             if (info.mConfig.GetTransportProto() == QueryConfig::kDnsTransportTcp)
@@ -1539,10 +1544,7 @@ void Client::HandleTimer(void)
         }
     }
 
-    if (nextTime < now.GetDistantFuture())
-    {
-        mTimer.FireAt(nextTime);
-    }
+    mTimer.FireAtIfEarlier(nextTime);
 
 #if OPENTHREAD_CONFIG_DNS_CLIENT_OVER_TCP_ENABLE
     if (!hasTcpQuery && mTcpState != kTcpUninitialized)
@@ -1589,6 +1591,60 @@ exit:
 
 #if OPENTHREAD_CONFIG_DNS_CLIENT_SERVICE_DISCOVERY_ENABLE
 
+void Client::CheckAndUpdateServiceMode(QueryConfig &aConfig, const QueryConfig *aRequestConfig) const
+{
+    // If the user explicitly requested "optimize" mode, we honor that
+    // request. Otherwise, if "optimize" is chosen from the default
+    // config, we check if the DNS server is known to have trouble
+    // with multiple-question queries. If so, we switch to "separate"
+    // mode.
+
+    if ((aRequestConfig != nullptr) && (aRequestConfig->GetServiceMode() == QueryConfig::kServiceModeSrvTxtOptimize))
+    {
+        ExitNow();
+    }
+
+    VerifyOrExit(aConfig.GetServiceMode() == QueryConfig::kServiceModeSrvTxtOptimize);
+
+    if (mLimitedQueryServers.Contains(aConfig.GetServerSockAddr().GetAddress()))
+    {
+        aConfig.SetServiceMode(QueryConfig::kServiceModeSrvTxtSeparate);
+    }
+
+exit:
+    return;
+}
+
+void Client::RecordServerAsLimitedToSingleQuestion(const Ip6::Address &aServerAddress)
+{
+    VerifyOrExit(!aServerAddress.IsUnspecified());
+
+    VerifyOrExit(!mLimitedQueryServers.Contains(aServerAddress));
+
+    if (mLimitedQueryServers.IsFull())
+    {
+        uint8_t randomIndex = Random::NonCrypto::GetUint8InRange(0, mLimitedQueryServers.GetMaxSize());
+
+        mLimitedQueryServers.Remove(mLimitedQueryServers[randomIndex]);
+    }
+
+    IgnoreError(mLimitedQueryServers.PushBack(aServerAddress));
+
+exit:
+    return;
+}
+
+void Client::RecordServerAsCapableOfMultiQuestions(const Ip6::Address &aServerAddress)
+{
+    Ip6::Address *entry = mLimitedQueryServers.Find(aServerAddress);
+
+    VerifyOrExit(entry != nullptr);
+    mLimitedQueryServers.Remove(*entry);
+
+exit:
+    return;
+}
+
 Error Client::ReplaceWithSeparateSrvTxtQueries(Query &aQuery)
 {
     Error     error = kErrorFailed;
@@ -1599,6 +1655,8 @@ Error Client::ReplaceWithSeparateSrvTxtQueries(Query &aQuery)
 
     VerifyOrExit(info.mQueryType == kServiceQuerySrvTxt);
     VerifyOrExit(info.mConfig.GetServiceMode() == QueryConfig::kServiceModeSrvTxtOptimize);
+
+    RecordServerAsLimitedToSingleQuestion(info.mConfig.GetServerSockAddr().GetAddress());
 
     secondQuery = aQuery.Clone();
     VerifyOrExit(secondQuery != nullptr);
@@ -1634,7 +1692,7 @@ void Client::ResolveHostAddressIfNeeded(Query &aQuery, const Message &aResponseM
 
     PopulateResponse(response, aQuery, aResponseMessage);
 
-    memset(&serviceInfo, 0, sizeof(serviceInfo));
+    ClearAllBytes(serviceInfo);
     serviceInfo.mHostNameBuffer     = hostName;
     serviceInfo.mHostNameBufferSize = sizeof(hostName);
     SuccessOrExit(response.ReadServiceInfo(Response::kAnswerSection, Name(aQuery, kNameOffsetInQuery), serviceInfo));

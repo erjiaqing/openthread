@@ -33,12 +33,7 @@
 
 #include "openthread-core-config.h"
 
-#include <openthread/link.h>
-
-#include "common/as_core_type.hpp"
-#include "common/locator_getters.hpp"
-#include "mac/mac.hpp"
-#include "radio/radio.hpp"
+#include "instance/instance.hpp"
 
 using namespace ot;
 
@@ -187,6 +182,11 @@ void otLinkSetMaxFrameRetriesIndirect(otInstance *aInstance, uint8_t aMaxFrameRe
 }
 
 #endif // OPENTHREAD_FTD
+
+uint32_t otLinkGetFrameCounter(otInstance *aInstance)
+{
+    return AsCoreType(aInstance).Get<Mac::SubMac>().GetFrameCounter();
+}
 
 #if OPENTHREAD_CONFIG_MAC_FILTER_ENABLE
 
